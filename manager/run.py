@@ -12,9 +12,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 if __name__ == "__main__":
-    with open('tools.pkl', 'rb') as f:
+    with open('tools_dict.pkl', 'rb') as f:
         tools = pickle.load(f)
-    tool = tools[0]
+    tool = tools['thermo_raw_file_converter']
     factory = RedisExchangeFactory('localhost', 6379)
     client = factory.bind_as_client(name="manager")
     agent_id = client.register_agent(RheaToolAgent, name=tool.name)
