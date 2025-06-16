@@ -17,8 +17,7 @@ if __name__ == "__main__":
     tool = tools[0]
     factory = RedisExchangeFactory('localhost', 6379)
     client = factory.bind_as_client(name="manager")
-    agent_id = client.register_agent(RheaToolAgent, name="test-rhea-agent")
-
+    agent_id = client.register_agent(RheaToolAgent, name=tool.name)
     fut = launch_agent(agent_id, tool)
     handle = client.get_handle(agent_id)
     
