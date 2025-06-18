@@ -1,6 +1,12 @@
 import os
 from lib.academy.academy.exchange.redis import RedisExchangeFactory
-from agent.tool import RheaToolAgent, RheaParam, RheaFileParam, RheaTextParam, RheaBooleanParam
+from agent.tool import (
+    RheaToolAgent,
+    RheaParam,
+    RheaFileParam,
+    RheaTextParam,
+    RheaBooleanParam,
+)
 from utils.schema import Tool
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
@@ -11,33 +17,33 @@ import pickle
 import logging
 import parsl
 from minio import Minio
+
 logging.basicConfig(level=logging.INFO)
 
 
 if __name__ == "__main__":
-    with open('tools_dict.pkl', 'rb') as f:
+    with open("tools_dict.pkl", "rb") as f:
         tools = pickle.load(f)
-    tool = tools['204bd0ff6499fcca']
-    connector = RedisConnector('localhost', 6379)
+    tool = tools["204bd0ff6499fcca"]
+    connector = RedisConnector("localhost", 6379)
 
-    with Store('rhea-input', connector, register=True) as input_store:
-        with open('test_files/test.csv', 'rb') as f:
+    with Store("rhea-input", connector, register=True) as input_store:
+        with open("test_files/test.csv", "rb") as f:
             buffer = f.read()
             proxy = input_store.proxy(buffer)
             key = get_key(proxy)
 
-            factory = RedisExchangeFactory('localhost', 6379)
+            factory = RedisExchangeFactory("localhost", 6379)
             client = factory.bind_as_client(name="manager")
 
             rhea_params = []
             for param in tool.inputs.params:
-                if param.name == 'input1':
+                if param.name == "input1":
                     rhea_params.append(RheaParam.from_param(param, key))
-                elif param.name == 'sep':
-                    rhea_params.append(RheaParam.from_param(param, ','))
-                elif param.name == 'header':
+                elif param.name == "sep":
+                    rhea_params.append(RheaParam.from_param(param, ","))
+                elif param.name == "header":
                     rhea_params.append(RheaParam.from_param(param, True))
-
 
             agent_id = client.register_agent(RheaToolAgent, name=tool.name)
             fut = launch_agent(
@@ -48,25 +54,21 @@ if __name__ == "__main__":
                 minio_endpoint="host.docker.internal:9000",
                 minio_access_key="admin",
                 minio_secret_key="password",
-                minio_secure=False
+                minio_secure=False,
             )
             handle = client.get_handle(agent_id)
-            
+
             packages = handle.get_installed_packages().result()
-    
-            
+
             tool_result = handle.run_tool(rhea_params).result()
 
             print(packages)
 
             for result in tool_result.files:
-                with Store('rhea-output', connector, register=True) as output_store:
+                with Store("rhea-output", connector, register=True) as output_store:
                     result = output_store.get(result.key)
                     print(result)
 
             handle.shutdown()
 
             parsl.dfk().cleanup()
-
-
-    

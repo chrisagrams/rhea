@@ -7,15 +7,15 @@ from minio import Minio
 
 @python_app(executors=["docker_workers"])
 def launch_agent(
-        agent_id: AgentId,
-        tool: Tool,
-        redis_host: str,
-        redis_port: int,
-        minio_endpoint: str,
-        minio_access_key: str,
-        minio_secret_key: str,
-        minio_secure: bool
-    ):
+    agent_id: AgentId,
+    tool: Tool,
+    redis_host: str,
+    redis_port: int,
+    minio_endpoint: str,
+    minio_access_key: str,
+    minio_secret_key: str,
+    minio_secure: bool,
+):
     from uuid import UUID
     from lib.academy.academy.exchange.redis import RedisExchangeFactory
     from lib.academy.academy.manager import Manager
@@ -29,9 +29,7 @@ def launch_agent(
     launchers: dict[str, Launcher] = {"default": ThreadLauncher()}
 
     with Manager(
-        exchange=factory,
-        launcher=launchers,
-        default_launcher="default"
+        exchange=factory, launcher=launchers, default_launcher="default"
     ) as manager:
         manager.launch(
             RheaToolAgent(
@@ -41,8 +39,8 @@ def launch_agent(
                 minio_endpoint=minio_endpoint,
                 minio_access_key=minio_access_key,
                 minio_secret_key=minio_secret_key,
-                minio_secure=minio_secure
-            ), 
-            agent_id=agent_id
+                minio_secure=minio_secure,
+            ),
+            agent_id=agent_id,
         )
         manager.wait(agent_id)
