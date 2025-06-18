@@ -2,12 +2,22 @@ FROM debian:stable-slim
 
 ARG TARGETARCH
 
-ENV MINICONDA_HOME=/opt/conda \
-    PATH=/opt/conda/bin:$PATH
+ENV MINICONDA_HOME=/home/rhea/conda \
+    PATH=/home/rhea/conda/bin:$PATH
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends wget ca-certificates bzip2 \
-  && case "$TARGETARCH" in \
+  && apt-get install -y --no-install-recommends wget ca-certificates bzip2 gettext-base\
+  && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash rhea
+
+
+COPY lib/academy /home/rhea/app/lib/academy
+RUN chown -R rhea:rhea /home/rhea/app
+
+USER rhea
+
+RUN case "$TARGETARCH" in \
     amd64)   CONDA_ARCH=Linux-x86_64   ;; \
     arm64)   CONDA_ARCH=Linux-aarch64   ;; \
     ppc64le) CONDA_ARCH=Linux-ppc64le   ;; \
@@ -17,16 +27,9 @@ RUN apt-get update \
   && wget -qO /tmp/miniconda.sh "https://repo.anaconda.com/miniconda/Miniconda3-latest-${CONDA_ARCH}.sh" \
   && bash /tmp/miniconda.sh -b -p $MINICONDA_HOME \
   && rm /tmp/miniconda.sh \
-  && $MINICONDA_HOME/bin/conda clean -afy \
-  && apt-get purge -y wget bzip2 \
-  && apt-get autoremove -y \
-  && rm -rf /var/lib/apt/lists/*
+  && $MINICONDA_HOME/bin/conda clean -afy 
 
-WORKDIR /app
-COPY utils/ /app/utils
-COPY agent/ /app/agent
-COPY manager/ /app/manager
-COPY lib/academy /app/lib/academy
+WORKDIR /home/rhea/app
 
 RUN conda install -y -c conda-forge uv \
   && conda clean -afy
@@ -35,10 +38,14 @@ RUN conda config --add channels bioconda \
   && conda config --add channels conda-forge \
   && conda config --set channel_priority strict
 
-RUN uv venv --python 3.10 /opt/venv \
- && . /opt/venv/bin/activate \
- && uv pip install -e /app/lib/academy \
- && uv pip install parsl proxystore
+RUN uv venv --python 3.10 /home/rhea/venv \
+ && . /home/rhea/venv/bin/activate \
+ && uv pip install -e /home/rhea/app/lib/academy \
+ && uv pip install parsl proxystore debugpy minio
+
+COPY utils/ /home/rhea/app/utils
+COPY agent/ /home/rhea/app/agent
+COPY manager/ /home/rhea/app/manager
 
 # ENTRYPOINT ["/opt/venv/bin/python"]
 

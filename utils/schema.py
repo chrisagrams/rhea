@@ -72,19 +72,6 @@ class Macros(BaseModel):
         Apply the macros and expands to an XML.
         As the exapands might change the layout of the XML, do this before making the XML a Tool object.
         '''
-        # tool_str = ET.tostring(tool_xml, encoding='utf8')
-
-        # if self.tokens is not None:
-        #     for token in self.tokens:
-        #         tool_str = tool_str.replace(token.name, token.value)
-        
-        # xml = ET.ElementTree(ET.fromstring(tool_str))
-        # if xml is not None:
-        #     root = xml.getroot()
-        #     if root is not None:
-        #         return root
-            
-        # raise Exception("Error applying macros.")
         for placeholder in tool_xml.findall(".//expand"):
             name = placeholder.get("macro")
             match = next((e for e in self.expands or [] if e.name == name), None)
@@ -203,6 +190,7 @@ class DataOutput(BaseModel):
     name: str
     format: str
     label: str
+    from_work_dir: Optional[str] = None
     change_format: Optional[ChangeFormat] = None
     filters: Optional[List[OutputFilter]] = None
     discover_datasets: Optional[DiscoverDatasets] = None
@@ -501,6 +489,7 @@ class Tool(BaseModel):
                         name=del_.get("name") or "",
                         format=del_.get("format") or "",
                         label=del_.get("label") or "",
+                        from_work_dir=del_.get("from_work_dir") or "",
                         change_format=cf,
                     )
                 )

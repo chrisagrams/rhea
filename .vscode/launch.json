@@ -6,7 +6,23 @@
       "type": "debugpy",
       "request": "launch",
       "module": "manager.run",
-      "justMyCode": false
+      "justMyCode": false,
+      "preLaunchTask": "Build rhea-worker (multi-arch)"
+    },
+    {
+      "name": "Attach to Parsl Worker",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5680
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/home/rhea/app"
+        }
+      ]
     }
   ]
 }

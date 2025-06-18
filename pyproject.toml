@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "parsl>=2025.6.9",
+    "minio>=7.2.15",
+    "parsl>=2025.6.16",
     "proxystore[all]>=0.8.2",
 ]

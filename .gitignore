@@ -10,3 +10,6 @@ wheels/
 .venv
 
 runinfo/
+test_files/
+
+.DS_Store/
