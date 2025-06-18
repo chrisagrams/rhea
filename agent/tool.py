@@ -13,26 +13,59 @@ from dataclasses import dataclass
 
 
 class RheaParam():
-    argument: str
-    name: str
-    type: str
-    format: str
+    def __init__(
+        self, 
+        name: str,
+        type: str,
+        argument: str | None = None
+    ) -> None:
+        self.name = name
+        self.type = type
+        self.argument = argument
 
 
 class RheaFileParam(RheaParam):
-    value: RedisKey
+    def __init__(
+        self,
+        name: str,
+        type: str,
+        format: str,
+        value: RedisKey,
+        argument: str | None = None
+    ) -> None:
+        super().__init__(name, type, argument)
+        self.format = format
+        self.value = value
 
 
 class RheaBooleanParam(RheaParam):
-    value: bool
-    truevalue: str
-    falsevalue: str
-    checked: bool
+    def __init__(
+        self,
+        name: str,
+        type: str,
+        truevalue: str,
+        falsevalue: str,
+        value: bool | None = None,
+        checked: bool | None = None,
+        argument: str | None = None
+    ) -> None:
+        super().__init__(name, type, argument)
+        self.truevalue = truevalue
+        self.falsevalue = falsevalue
+        self.value = value
+        self.checked = checked
 
 
 class RheaTextParam(RheaParam):
-    value: str
-
+    def __init__(
+        self,
+        name: str,
+        type: str,
+        value: str,
+        argument: str | None = None
+    ) -> None:
+        super().__init__(name, type, argument)
+        self.value = value
 
 @dataclass
 class RheaDataOutput():

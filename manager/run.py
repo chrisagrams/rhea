@@ -43,31 +43,12 @@ if __name__ == "__main__":
             handle = client.get_handle(agent_id)
             
             packages = handle.get_installed_packages().result()
+            
+            file_param = RheaFileParam("input1", "data", "csv", key)
+            
+            text_param = RheaTextParam("sep", "text", ",")
 
-            # file_param = RheaFileParam()
-            # file_param.argument = "--input"
-            # file_param.name = "input_file"
-            # file_param.type = "data"
-            # file_param.format = "thermo.raw"
-            # file_param.value = key
-
-            file_param = RheaFileParam()
-            file_param.name = "input1"
-            file_param.type = "data"
-            file_param.format = "csv"
-            file_param.value = key
-
-            text_param = RheaTextParam()
-            text_param.name = "sep"
-            text_param.type = "text"
-            text_param.value = ","
-
-            bool_param = RheaBooleanParam()
-            bool_param.name = "header"
-            bool_param.type = "boolean"
-            bool_param.truevalue = "TRUE"
-            bool_param.falsevalue = "FALSE"
-            bool_param.checked = True
+            bool_param = RheaBooleanParam("header", "boolean", "TRUE", "FALSE", checked=True)
             
             
             tool_result = handle.run_tool([file_param, text_param, bool_param]).result()
