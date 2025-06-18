@@ -1,6 +1,6 @@
 from lib.academy.academy.behavior import Behavior, action, loop
-from typing import List, Optional
-from utils.schema import Tool
+from typing import List, Optional, Any
+from utils.schema import Tool, Param
 import os
 import subprocess
 import json
@@ -23,6 +23,23 @@ class RheaParam():
         self.type = type
         self.argument = argument
 
+    @classmethod
+    def from_param(cls, param: Param, value: Any) -> "RheaParam":
+        if param.type == "data": # RheaFileParam
+            if type(value) is not RedisKey:
+                raise ValueError("Value must be a 'RedisKey' for data param.")
+            return RheaFileParam.from_param(param, value)
+        elif param.type == "text": # RheaTextParam
+            if type(value) is not str:
+                raise ValueError("Value must be a 'str' for text param.")
+            return RheaTextParam.from_param(param, value)
+        elif param.type == "boolean":
+            if type(value) is not bool:
+                raise ValueError("Value must be a 'bool' for boolean param.")
+            return RheaBooleanParam.from_param(param, value)
+        raise NotImplementedError(f"Param {param.type} not implemented.")
+
+
 
 class RheaFileParam(RheaParam):
     def __init__(
@@ -36,6 +53,17 @@ class RheaFileParam(RheaParam):
         super().__init__(name, type, argument)
         self.format = format
         self.value = value
+    
+    @classmethod
+    def from_param(cls, param: Param, value: RedisKey) -> "RheaFileParam":
+        if param.name is None or param.type is None or param.format is None:
+            raise ValueError("Required fields are 'None'")
+        return cls(
+            name=param.name,
+            type=param.type,
+            format=param.format,
+            value=value
+        )
 
 
 class RheaBooleanParam(RheaParam):
@@ -56,6 +84,22 @@ class RheaBooleanParam(RheaParam):
         self.checked = checked
 
 
+    @classmethod
+    def from_param(cls, param: Param, value: bool) -> "RheaBooleanParam":
+        if param.name is None or param.type is None or param.truevalue is None or param.falsevalue is None:
+            raise ValueError("Required fields are 'None'")
+        if param.value is None and param.checked is None:
+            raise ValueError("Either 'value' or 'checked' must not be 'None'")
+        return cls(
+            name=param.name,
+            type=param.type,
+            truevalue=param.truevalue,
+            falsevalue=param.falsevalue,
+            checked=value,
+            value=value
+        )
+
+
 class RheaTextParam(RheaParam):
     def __init__(
         self,
@@ -66,6 +110,17 @@ class RheaTextParam(RheaParam):
     ) -> None:
         super().__init__(name, type, argument)
         self.value = value
+
+    @classmethod
+    def from_param(cls, param: Param, value: str) -> "RheaTextParam":
+        if param.name is None or param.type is None:
+            raise ValueError("Required fields are 'None'")
+        return cls(
+            name=param.name,
+            type=param.type,
+            value=value
+        )
+
 
 @dataclass
 class RheaDataOutput():

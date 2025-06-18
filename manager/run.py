@@ -29,6 +29,16 @@ if __name__ == "__main__":
             factory = RedisExchangeFactory('localhost', 6379)
             client = factory.bind_as_client(name="manager")
 
+            rhea_params = []
+            for param in tool.inputs.params:
+                if param.name == 'input1':
+                    rhea_params.append(RheaParam.from_param(param, key))
+                elif param.name == 'sep':
+                    rhea_params.append(RheaParam.from_param(param, ','))
+                elif param.name == 'header':
+                    rhea_params.append(RheaParam.from_param(param, True))
+
+
             agent_id = client.register_agent(RheaToolAgent, name=tool.name)
             fut = launch_agent(
                 agent_id,
@@ -43,15 +53,9 @@ if __name__ == "__main__":
             handle = client.get_handle(agent_id)
             
             packages = handle.get_installed_packages().result()
+    
             
-            file_param = RheaFileParam("input1", "data", "csv", key)
-            
-            text_param = RheaTextParam("sep", "text", ",")
-
-            bool_param = RheaBooleanParam("header", "boolean", "TRUE", "FALSE", checked=True)
-            
-            
-            tool_result = handle.run_tool([file_param, text_param, bool_param]).result()
+            tool_result = handle.run_tool(rhea_params).result()
 
             print(packages)
 
