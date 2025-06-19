@@ -10,6 +10,14 @@
       "preLaunchTask": "Build rhea-worker (multi-arch)"
     },
     {
+      "name": "Run test manager module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "manager.run_test",
+      "justMyCode": false,
+      "preLaunchTask": "Build rhea-worker (multi-arch)"
+    },
+    {
       "name": "Attach to Parsl Worker",
       "type": "debugpy",
       "request": "attach",
