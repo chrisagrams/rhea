@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import List, Optional, Union, Dict
+from typing import ClassVar, List, Optional, Sequence, Union, Dict
 from functools import wraps
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
 
 class XmlNode(BaseModel):
     tag: str
@@ -17,9 +18,9 @@ class XmlNode(BaseModel):
             tag=el.tag,
             attrib=el.attrib,
             text=el.text.strip() if el.text and el.text.strip() else None,
-            children=[cls.from_element(child) for child in el]
+            children=[cls.from_element(child) for child in el],
         )
-    
+
     def to_element(self) -> ET.Element:
         el = ET.Element(self.tag, self.attrib or {})
         if self.text:
@@ -28,14 +29,16 @@ class XmlNode(BaseModel):
             el.append(child.to_element())
         return el
 
-        
+
 class Token(BaseModel):
     name: str
     value: str
 
+
 class MacroExpand(BaseModel):
     name: str
     expand: XmlNode
+
 
 class Macros(BaseModel):
     tokens: Optional[List[Token]] = None
@@ -56,22 +59,26 @@ class Macros(BaseModel):
         token_els = root.findall("token")
         tokens = []
         for token_el in token_els:
-            tokens.append(Token(name=token_el.get("name") or "", value=token_el.text or ""))
-        
+            tokens.append(
+                Token(name=token_el.get("name") or "", value=token_el.text or "")
+            )
+
         xml_els = root.findall("xml")
         expands = []
         for xml in xml_els:
-            expands.append(MacroExpand(name=xml.get("name") or "", expand=XmlNode.from_element(xml)))
+            expands.append(
+                MacroExpand(
+                    name=xml.get("name") or "", expand=XmlNode.from_element(xml)
+                )
+            )
 
-        return cls(
-            tokens=tokens,
-            expands=expands
-        )
+        return cls(tokens=tokens, expands=expands)
+
     def apply_to_tool(self, tool_xml: ET.Element) -> ET.Element:
-        '''
+        """
         Apply the macros and expands to an XML.
         As the exapands might change the layout of the XML, do this before making the XML a Tool object.
-        '''
+        """
         for placeholder in tool_xml.findall(".//expand"):
             name = placeholder.get("macro")
             match = next((e for e in self.expands or [] if e.name == name), None)
@@ -106,8 +113,6 @@ class Macros(BaseModel):
                     el.attrib[attr] = rep_val
 
         return tool_xml
-
-
 
 
 class Xref(BaseModel):
@@ -253,8 +258,105 @@ class Inputs(BaseModel):
 
 
 class AssertContents(BaseModel):
-    has_text: Optional[List[str]] = None
-    not_has_text: Optional[List[str]] = None
+    has_line: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_line_matching: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_n_lines: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_text: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_text_matching: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    not_has_text: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_n_columns: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    attribute_is: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    attribute_matches: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    element_text: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    element_text_is: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    element_text_matches: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_element_with_path: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_n_elements_with_path: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    is_valid_xml: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    xml_element: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_json_property_with_text: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_json_property_with_value: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_h5_attribute: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_h5_keys: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_archive_member: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_size: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_center_of_mass: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_channels: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_depth: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_frames: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_height: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_mean_intensity: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_mean_object_size: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_n_labels: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+    has_image_width: Optional[Sequence[Union[str, Dict[str, str]]]] = None
+
+    _xml_attrs: ClassVar[Dict[str, Union[str, List[str]]]] = {
+        "has_line": ["line", "n", "delta", "min", "max", "negate"],
+        "has_line_matching": ["expression", "n", "delta", "min", "max", "negate"],
+        "has_n_lines": ["n", "delta", "min", "max", "negate"],
+        "has_text": ["text", "n", "delta", "min", "max", "negate"],
+        "has_text_matching": ["expression", "n", "delta", "min", "max", "negate"],
+        "not_has_text": ["text"],
+        "has_n_columns": ["n", "delta", "min", "max", "sep", "comment", "negate"],
+        "attribute_is": ["path", "attribute", "text", "negate"],
+        "attribute_matches": ["path", "attribute", "expression", "negate"],
+        "element_text": ["path", "negate"],
+        "element_text_is": ["path", "text", "negate"],
+        "element_text_matches": ["path", "expression", "negate"],
+        "has_element_with_path": ["path", "negate"],
+        "has_n_elements_with_path": ["path", "n", "delta", "min", "max", "negate"],
+        "is_valid_xml": [],  # presence-only
+        "xml_element": [
+            "path",
+            "attribute",
+            "all",
+            "n",
+            "delta",
+            "min",
+            "max",
+            "negate",
+        ],
+        "has_json_property_with_text": ["property", "text"],
+        "has_json_property_with_value": ["property", "value"],
+        "has_h5_attribute": ["key", "value"],
+        "has_h5_keys": ["keys"],
+        "has_archive_member": ["path", "all", "n", "delta", "min", "max", "negate"],
+        "has_size": ["value", "size", "delta", "min", "max", "negate"],
+        "has_image_center_of_mass": [
+            "center_of_mass",
+            "channel",
+            "slice",
+            "frame",
+            "eps",
+        ],
+        "has_image_channels": ["channels", "delta", "min", "max", "negate"],
+        "has_image_depth": ["depth", "delta", "min", "max", "negate"],
+        "has_image_frames": ["frames", "delta", "min", "max", "negate"],
+        "has_image_height": ["height", "delta", "min", "max", "negate"],
+        "has_image_mean_intensity": ["mean_intensity", "eps", "min", "max"],
+        "has_image_mean_object_size": [
+            "mean_object_size",
+            "labels",
+            "exclude_labels",
+            "eps",
+            "min",
+            "max",
+        ],
+        "has_image_n_labels": [
+            "labels",
+            "exclude_labels",
+            "n",
+            "delta",
+            "min",
+            "max",
+            "negate",
+        ],
+        "has_image_width": ["width", "delta", "min", "max", "negate"],
+    }
+
+    @classmethod
+    def xml_attrs_for(cls, field: str) -> Union[str, List[str]]:
+        return cls._xml_attrs.get(field, [])
 
 
 class DiscoveredDataset(BaseModel):
@@ -347,7 +449,7 @@ class Tool(BaseModel):
             macro_map = {tok.name: tok.value for tok in macros.tokens}
         else:
             macro_map = None
-        
+
         def expand_str(s: str) -> str | None:
             if macro_map is not None:
                 for tok, val in macro_map.items():
@@ -557,32 +659,59 @@ class Tool(BaseModel):
                     ac_el = oel.find("assert_contents")
                     ac = None
                     if ac_el is not None:
-                        has_ = [h.get("text") or "" for h in ac_el.findall("has_text")]
-                        not_ = [
-                            n.get("text") or "" for n in ac_el.findall("not_has_text")
-                        ]
-                        ac = AssertContents(
-                            has_text=has_ or None, not_has_text=not_ or None
-                        )
+                        ac_data: Dict[
+                            str, Union[List[str], List[Dict[str, str]], None]
+                        ] = {}
+                        for name in AssertContents.__fields__:
+                            attrs = AssertContents.xml_attrs_for(name)
+                            elems = ac_el.findall(name)
+                            if not elems:
+                                ac_data[name] = None
+                                continue
+
+                            if isinstance(attrs, str):
+                                vals = [el.get(attrs) or "" for el in elems]
+                            else:
+                                if not attrs:
+                                    vals = [{} for _ in elems]
+                                else:
+                                    vals = [
+                                        {a: (el.get(a) or "") for a in attrs}
+                                        for el in elems
+                                    ]
+
+                            ac_data[name] = vals or None
+
+                        ac = AssertContents(**ac_data)
 
                     # Discovered_dataset nested inside <output>
                     ds_el = oel.find("discovered_dataset")
                     ds = None
                     if ds_el is not None:
-                        dd_ac_el = ds_el.find("assert_contents")
-                        dd_ac = None
-                        if dd_ac_el is not None:
-                            has_dd = [
-                                h.get("text") or ""
-                                for h in dd_ac_el.findall("has_text")
-                            ]
-                            not_dd = [
-                                n.get("text") or ""
-                                for n in dd_ac_el.findall("not_has_text")
-                            ]
-                            dd_ac = AssertContents(
-                                has_text=has_dd or None, not_has_text=not_dd or None
-                            )
+                        ds_data: Dict[
+                            str, Union[List[str], List[Dict[str, str]], None]
+                        ] = {}
+                        for name in AssertContents.__fields__:
+                            attrs = AssertContents.xml_attrs_for(name)
+                            elems = ds_el.findall(name)
+                            if not elems:
+                                ds_data[name] = None
+                                continue
+
+                            if isinstance(attrs, str):
+                                vals = [el.get(attrs) or "" for el in elems]
+                            else:
+                                if not attrs:
+                                    vals = [{} for _ in elems]
+                                else:
+                                    vals = [
+                                        {a: (el.get(a) or "") for a in attrs}
+                                        for el in elems
+                                    ]
+
+                            ds_data[name] = vals or None
+
+                        dd_ac = AssertContents(**ds_data)
                         ds = DiscoveredDataset(
                             designation=ds_el.get("designation") or "",
                             ftype=ds_el.get("ftype") or "",
