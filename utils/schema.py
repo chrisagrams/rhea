@@ -162,10 +162,16 @@ class OutputFilter(BaseModel):
 
 
 class DiscoverDatasets(BaseModel):
-    pattern: str
-    ext: str
-    visible: bool
     assign_primary_output: Optional[bool] = None
+    from_provided_metadata: Optional[bool] = None
+    pattern: Optional[str] = None
+    directory: Optional[str] = None
+    recurse: Optional[bool] = None
+    match_relative_path: Optional[bool] = None
+    format: Optional[str] = None
+    ext: Optional[str] = None
+    sort_by: Optional[str] = None
+    visible: Optional[bool] = None
 
 
 class ActionOption(BaseModel):
@@ -213,6 +219,8 @@ class CollectionOutput(BaseModel):
     type: str
     label: str
     data: List[CollectionData]
+    discover_datasets: Optional[DiscoverDatasets] = None
+
 
 
 class Outputs(BaseModel):
@@ -586,6 +594,27 @@ class Tool(BaseModel):
                         for w in cf_el.findall("when")
                     ]
                     cf = ChangeFormat(whens=whens)
+
+                dd = None
+                dd_el = del_.find("discover_datasets")
+                if dd_el is not None:
+                    dd_el_apo = dd_el.get("assign_primary_output")
+                    dd_el_fpm = dd_el.get("from_provided_metadata")
+                    dd_el_recurse = dd_el.get("recurse")
+                    dd_el_mrp = dd_el.get("match_relative_path")
+                    dd_el_visible = dd_el.get("visible")
+                    dd = DiscoverDatasets(
+                        assign_primary_output=True if dd_el_apo == "true" else False if dd_el_apo is not None else None,
+                        from_provided_metadata=True if dd_el_fpm == "true" else False if dd_el_fpm is not None else None,
+                        pattern=dd_el.get("pattern"),
+                        directory=dd_el.get("directory"),
+                        recurse=True if dd_el_recurse == "true" else False if dd_el_recurse is not None else None,
+                        match_relative_path=True if dd_el_mrp == "true" else False if dd_el_mrp is not None else None,
+                        format=dd_el.get("format"),
+                        ext=dd_el.get("ext"),
+                        sort_by=dd_el.get("sort_by"),
+                        visible=True if dd_el_visible == "true" else False if dd_el_visible is not None else None
+                    )
                 data.append(
                     DataOutput(
                         name=del_.get("name") or "",
@@ -593,6 +622,7 @@ class Tool(BaseModel):
                         label=del_.get("label") or "",
                         from_work_dir=del_.get("from_work_dir") or "",
                         change_format=cf,
+                        discover_datasets=dd
                     )
                 )
 
@@ -606,12 +636,33 @@ class Tool(BaseModel):
                     )
                     for d in cel.findall("data")
                 ]
+                dd = None
+                dd_el = cel.find("discover_datasets")
+                if dd_el is not None:
+                    dd_el_apo = dd_el.get("assign_primary_output")
+                    dd_el_fpm = dd_el.get("from_provided_metadata")
+                    dd_el_recurse = dd_el.get("recurse")
+                    dd_el_mrp = dd_el.get("match_relative_path")
+                    dd_el_visible = dd_el.get("visible")
+                    dd = DiscoverDatasets(
+                        assign_primary_output=True if dd_el_apo == "true" else False if dd_el_apo is not None else None,
+                        from_provided_metadata=True if dd_el_fpm == "true" else False if dd_el_fpm is not None else None,
+                        pattern=dd_el.get("pattern"),
+                        directory=dd_el.get("directory"),
+                        recurse=True if dd_el_recurse == "true" else False if dd_el_recurse is not None else None,
+                        match_relative_path=True if dd_el_mrp == "true" else False if dd_el_mrp is not None else None,
+                        format=dd_el.get("format"),
+                        ext=dd_el.get("ext"),
+                        sort_by=dd_el.get("sort_by"),
+                        visible=True if dd_el_visible == "true" else False if dd_el_visible is not None else None
+                    )
                 collection.append(
                     CollectionOutput(
                         name=cel.get("name") or "",
                         type=cel.get("type") or "",
                         label=cel.get("label") or "",
                         data=collection_data,
+                        discover_datasets=dd
                     )
                 )
 
