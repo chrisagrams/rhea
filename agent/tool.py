@@ -20,6 +20,10 @@ class RheaParam:
 
     @classmethod
     def from_param(cls, param: Param, value: Any) -> "RheaParam":
+        if param.name is None and param.argument is not None:
+            # An edge case where name is not specified in the param,
+            # but its assumed its the same as argument.
+            param.name = param.argument.replace("--", "")
         if param.type == "data":  # RheaFileParam
             if type(value) is not RedisKey:
                 raise ValueError("Value must be a 'RedisKey' for data param.")
@@ -30,8 +34,17 @@ class RheaParam:
             return RheaTextParam.from_param(param, value)
         elif param.type == "boolean":
             if type(value) is not bool:
-                raise ValueError("Value must be a 'bool' for boolean param.")
+                if value.lower() == 'true':
+                    value = True
+                elif value.lower() == 'false':
+                    value = False
+                else:
+                    raise ValueError("Value must be a 'bool' for boolean param.")
             return RheaBooleanParam.from_param(param, value)
+        elif param.type == "select":
+            if type(value) is not str:
+                raise ValueError("Value must be a 'str' for select param.")
+            return RheaSelectParam.from_param(param, value)
         raise NotImplementedError(f"Param {param.type} not implemented.")
 
 
@@ -105,6 +118,26 @@ class RheaTextParam(RheaParam):
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value)
+    
+
+class RheaSelectParam(RheaParam):
+    def __init__(
+            self, name: str, type: str, value: str, argument: str | None = None
+    ) -> None:
+        super().__init__(name, type, argument)
+        self.value = value
+    
+    @classmethod
+    def from_param(cls, param: Param, value:  str) -> "RheaSelectParam":
+        if param.name is None or param.type is None:
+            raise ValueError("Required fields are 'None'")
+        if param.options is None:
+            raise ValueError("Param has no options.")
+        for option in param.options:
+            if option.text == value:
+                return cls(name=param.name, type=param.type, value=option.value)
+        raise ValueError(f"Value {value} not in select options.")
+
 
 
 @dataclass
