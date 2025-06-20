@@ -1,7 +1,8 @@
 from lib.academy.academy.behavior import Behavior, action, loop
 from typing import List, Optional, Any
-from utils.schema import Tool, Param
+from utils.schema import Tool, Param, CollectionOutput
 import os
+import glob
 import subprocess
 import json
 import re
@@ -167,6 +168,38 @@ class RheaOutput:
     stdout: str
     stderr: str
     files: Optional[List[RheaDataOutput]] = None
+
+
+class RheaCollectionOuput(RheaOutput):
+    def __init__(self, return_code: int, stdout: str, stderr: str, collections: List[CollectionOutput]) -> None:
+        super().__init__(return_code, stdout, stderr)
+        self.collections = collections
+    
+    def resolve(self, output_dir: str, store: Store[RedisConnector]) -> None:
+        for collection in self.collections:
+            if collection.type == 'list':
+                if collection.discover_datasets is None:
+                    raise ValueError("Discover datasets is None")
+                if collection.discover_datasets.pattern is not None: # Regex method
+                    rgx = re.compile(collection.discover_datasets.pattern.replace("\\\\", "\\"))
+                    search_path = output_dir
+                    if collection.discover_datasets.directory is not None:
+                        search_path = os.path.join(output_dir, collection.discover_datasets.directory)
+                    listing = glob.glob(
+                        f"{search_path}/*",
+                        recursive=collection.discover_datasets.recurse if collection.discover_datasets.recurse is not None else False
+                    )
+                    for file in listing:
+                        if rgx.match(file):
+                            if self.files is None:
+                                self.files = []
+                            self.files.append(RheaDataOutput.from_file(file, store))
+                else:
+                    raise NotImplementedError(f"Discover dataset method not implemented.")
+            else: 
+                raise NotImplementedError(f"CollectionOutput type of {collection.type} not implemented.")
+
+    
 
 
 class RheaToolAgent(Behavior):
@@ -425,8 +458,15 @@ class RheaToolAgent(Behavior):
                                 RheaDataOutput.from_file(env[out.name], output_store)
                             )
                 elif self.tool.outputs.collection is not None:
+                    outputs = RheaCollectionOuput(
+                        return_code=result.returncode,
+                        stdout=result.stdout,
+                        stderr=result.stderr,
+                        collections=self.tool.outputs.collection
+                    )
                     if outputs.files is None:
                         outputs.files = []
-                        
+                        outputs.resolve(output, output_store)
+
 
                 return outputs
