@@ -4,6 +4,7 @@ from utils.schema import Tool, Param
 import os
 import subprocess
 import json
+import re
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
@@ -184,6 +185,10 @@ class RheaToolAgent(Behavior):
         self.python_verion: str = "3.8"
         self.installed_packages: List[str]
         self.connector = RedisConnector(redis_host, redis_port)
+        self.replace_galaxy_var('GALAXY_SLOTS', None) # TODO, allow user to pass how many threads to use
+        self.replace_galaxy_var('GALAXY_MEMORY_MB', None) # TODO, allow user to pass how much memory to use
+        self.replace_galaxy_var('GALAXY_MEMORY_MB_PER_SLOT', None) # TODO, allow user to pass how much memory to use per slot
+
 
         self.minio = Minio(
             endpoint=minio_endpoint,
@@ -305,6 +310,43 @@ class RheaToolAgent(Behavior):
 
         return dir
 
+    def replace_galaxy_var(self, var: str, value: Optional[int] = None) -> None:
+        """
+        Replace occurrences of "\${VAR:-Z}" (with or without surrounding quotes) in `script`.
+        If `value` is given, use it; otherwise keep the default Z.
+        """
+        pattern = re.compile(rf'"?\\\$\{{{re.escape(var)}:-(\d+)\}}"?')
+        def _repl(m: re.Match) -> str:
+            default = m.group(1)
+            return str(value) if value is not None else default
+        self.tool.command = pattern.sub(_repl, self.tool.command)
+
+
+    def expand_galaxy_if(self, cmd: str) -> str:
+        """
+        TODO Have this actually expand the if statements
+        """
+        pattern = re.compile(r'#if\b.*?#end(?:\s*if)?\b', flags=re.IGNORECASE)
+        return pattern.sub('', cmd).strip()
+    
+    def unescape_bash_vars(self, cmd: str) -> str:
+        """
+        Turn every '\$foo' into '$foo' so that bash will expand it at runtime.
+        """
+        # Replace any backslash immediately before a $ with nothing
+        return re.sub(r'\\\$', r'$', cmd)
+
+    def fix_var_quotes(self, cmd: str) -> str:
+        """
+        Replace any single-quoted $VAR or ${…} with double-quotes so
+        bash will expand them at runtime.
+        E.g.  '$__tool_directory__' → "$__tool_directory__"
+        """
+        # This will match a single quote, then a $ plus anything up to the next single-quote,
+        # then that closing quote. We capture the $… inside.
+        pattern = re.compile(r"'(\$[^']+)'")
+        return pattern.sub(r'"\1"', cmd)
+    
     @action
     def run_tool(self, params: List[RheaParam]) -> RheaOutput:
         env = os.environ.copy()
@@ -337,10 +379,14 @@ class RheaToolAgent(Behavior):
                     elif isinstance(param, RheaTextParam):
                         env[param.name] = param.value
                 # Configure command script
+                cmd = " ".join(self.tool.command.split()) # Collapse to one line
+                cmd = self.expand_galaxy_if(cmd)
+                cmd = self.unescape_bash_vars(cmd)
+                cmd = self.fix_var_quotes(cmd)
                 with NamedTemporaryFile("w", suffix=".sh", delete=False) as tf:
                     script_path = tf.name
                     tf.write("#!/usr/bin/env bash\n")
-                    tf.write(self.tool.command)
+                    tf.write(cmd + "\n")
                     os.chmod(script_path, 0o755)
 
                 # Configure outputs
@@ -356,9 +402,7 @@ class RheaToolAgent(Behavior):
                     "-n",
                     self.tool.id,
                     "--no-capture-output",
-                    "bash",
-                    "-c",
-                    f"envsubst < '{script_path}' | bash",
+                    "bash", script_path,
                 ]
                 result = subprocess.run(
                     cmd, env=env, cwd=cwd, capture_output=True, text=True
@@ -380,5 +424,9 @@ class RheaToolAgent(Behavior):
                             outputs.files.append(
                                 RheaDataOutput.from_file(env[out.name], output_store)
                             )
+                elif self.tool.outputs.collection is not None:
+                    if outputs.files is None:
+                        outputs.files = []
+                        
 
                 return outputs
