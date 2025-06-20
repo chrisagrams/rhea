@@ -36,9 +36,9 @@ class RheaParam:
             return RheaTextParam.from_param(param, value)
         elif param.type == "boolean":
             if type(value) is not bool:
-                if value.lower() == 'true':
+                if value.lower() == "true":
                     value = True
-                elif value.lower() == 'false':
+                elif value.lower() == "false":
                     value = False
                 else:
                     raise ValueError("Value must be a 'bool' for boolean param.")
@@ -120,17 +120,17 @@ class RheaTextParam(RheaParam):
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value)
-    
+
 
 class RheaSelectParam(RheaParam):
     def __init__(
-            self, name: str, type: str, value: str, argument: str | None = None
+        self, name: str, type: str, value: str, argument: str | None = None
     ) -> None:
         super().__init__(name, type, argument)
         self.value = value
-    
+
     @classmethod
-    def from_param(cls, param: Param, value:  str) -> "RheaSelectParam":
+    def from_param(cls, param: Param, value: str) -> "RheaSelectParam":
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         if param.options is None:
@@ -139,7 +139,6 @@ class RheaSelectParam(RheaParam):
             if option.text == value:
                 return cls(name=param.name, type=param.type, value=option.value)
         raise ValueError(f"Value {value} not in select options.")
-
 
 
 @dataclass
@@ -171,23 +170,37 @@ class RheaOutput:
 
 
 class RheaCollectionOuput(RheaOutput):
-    def __init__(self, return_code: int, stdout: str, stderr: str, collections: List[CollectionOutput]) -> None:
+    def __init__(
+        self,
+        return_code: int,
+        stdout: str,
+        stderr: str,
+        collections: List[CollectionOutput],
+    ) -> None:
         super().__init__(return_code, stdout, stderr)
         self.collections = collections
-    
+
     def resolve(self, output_dir: str, store: Store[RedisConnector]) -> None:
         for collection in self.collections:
-            if collection.type == 'list':
+            if collection.type == "list":
                 if collection.discover_datasets is None:
                     raise ValueError("Discover datasets is None")
-                if collection.discover_datasets.pattern is not None: # Regex method
-                    rgx = re.compile(collection.discover_datasets.pattern.replace("\\\\", "\\"))
+                if collection.discover_datasets.pattern is not None:  # Regex method
+                    rgx = re.compile(
+                        collection.discover_datasets.pattern.replace("\\\\", "\\")
+                    )
                     search_path = output_dir
                     if collection.discover_datasets.directory is not None:
-                        search_path = os.path.join(output_dir, collection.discover_datasets.directory)
+                        search_path = os.path.join(
+                            output_dir, collection.discover_datasets.directory
+                        )
                     listing = glob.glob(
                         f"{search_path}/*",
-                        recursive=collection.discover_datasets.recurse if collection.discover_datasets.recurse is not None else False
+                        recursive=(
+                            collection.discover_datasets.recurse
+                            if collection.discover_datasets.recurse is not None
+                            else False
+                        ),
                     )
                     for file in listing:
                         if rgx.match(file):
@@ -195,11 +208,13 @@ class RheaCollectionOuput(RheaOutput):
                                 self.files = []
                             self.files.append(RheaDataOutput.from_file(file, store))
                 else:
-                    raise NotImplementedError(f"Discover dataset method not implemented.")
-            else: 
-                raise NotImplementedError(f"CollectionOutput type of {collection.type} not implemented.")
-
-    
+                    raise NotImplementedError(
+                        f"Discover dataset method not implemented."
+                    )
+            else:
+                raise NotImplementedError(
+                    f"CollectionOutput type of {collection.type} not implemented."
+                )
 
 
 class RheaToolAgent(Behavior):
@@ -218,10 +233,15 @@ class RheaToolAgent(Behavior):
         self.python_verion: str = "3.8"
         self.installed_packages: List[str]
         self.connector = RedisConnector(redis_host, redis_port)
-        self.replace_galaxy_var('GALAXY_SLOTS', None) # TODO, allow user to pass how many threads to use
-        self.replace_galaxy_var('GALAXY_MEMORY_MB', None) # TODO, allow user to pass how much memory to use
-        self.replace_galaxy_var('GALAXY_MEMORY_MB_PER_SLOT', None) # TODO, allow user to pass how much memory to use per slot
-
+        self.replace_galaxy_var(
+            "GALAXY_SLOTS", None
+        )  # TODO, allow user to pass how many threads to use
+        self.replace_galaxy_var(
+            "GALAXY_MEMORY_MB", None
+        )  # TODO, allow user to pass how much memory to use
+        self.replace_galaxy_var(
+            "GALAXY_MEMORY_MB_PER_SLOT", None
+        )  # TODO, allow user to pass how much memory to use per slot
 
         self.minio = Minio(
             endpoint=minio_endpoint,
@@ -349,25 +369,26 @@ class RheaToolAgent(Behavior):
         If `value` is given, use it; otherwise keep the default Z.
         """
         pattern = re.compile(rf'"?\\\$\{{{re.escape(var)}:-(\d+)\}}"?')
+
         def _repl(m: re.Match) -> str:
             default = m.group(1)
             return str(value) if value is not None else default
-        self.tool.command = pattern.sub(_repl, self.tool.command)
 
+        self.tool.command = pattern.sub(_repl, self.tool.command)
 
     def expand_galaxy_if(self, cmd: str) -> str:
         """
         TODO Have this actually expand the if statements
         """
-        pattern = re.compile(r'#if\b.*?#end(?:\s*if)?\b', flags=re.IGNORECASE)
-        return pattern.sub('', cmd).strip()
-    
+        pattern = re.compile(r"#if\b.*?#end(?:\s*if)?\b", flags=re.IGNORECASE)
+        return pattern.sub("", cmd).strip()
+
     def unescape_bash_vars(self, cmd: str) -> str:
         """
         Turn every '\$foo' into '$foo' so that bash will expand it at runtime.
         """
         # Replace any backslash immediately before a $ with nothing
-        return re.sub(r'\\\$', r'$', cmd)
+        return re.sub(r"\\\$", r"$", cmd)
 
     def fix_var_quotes(self, cmd: str) -> str:
         """
@@ -379,7 +400,7 @@ class RheaToolAgent(Behavior):
         # then that closing quote. We capture the $… inside.
         pattern = re.compile(r"'(\$[^']+)'")
         return pattern.sub(r'"\1"', cmd)
-    
+
     @action
     def run_tool(self, params: List[RheaParam]) -> RheaOutput:
         env = os.environ.copy()
@@ -412,7 +433,7 @@ class RheaToolAgent(Behavior):
                     elif isinstance(param, RheaTextParam):
                         env[param.name] = param.value
                 # Configure command script
-                cmd = " ".join(self.tool.command.split()) # Collapse to one line
+                cmd = " ".join(self.tool.command.split())  # Collapse to one line
                 cmd = self.expand_galaxy_if(cmd)
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
@@ -435,7 +456,8 @@ class RheaToolAgent(Behavior):
                     "-n",
                     self.tool.id,
                     "--no-capture-output",
-                    "bash", script_path,
+                    "bash",
+                    script_path,
                 ]
                 result = subprocess.run(
                     cmd, env=env, cwd=cwd, capture_output=True, text=True
@@ -462,11 +484,10 @@ class RheaToolAgent(Behavior):
                         return_code=result.returncode,
                         stdout=result.stdout,
                         stderr=result.stderr,
-                        collections=self.tool.outputs.collection
+                        collections=self.tool.outputs.collection,
                     )
                     if outputs.files is None:
                         outputs.files = []
                         outputs.resolve(output, output_store)
-
 
                 return outputs
