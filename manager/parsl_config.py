@@ -12,6 +12,8 @@ docker_cmd = (
     "--add-host=host.docker.internal:host-gateway "
     "-e REDIS_HOST=host.docker.internal "
     "-e REDIS_PORT=6379 "
+    "-e HTTP_PROXY=http://host.docker.internal:3128 "
+    "-e HTTPS_PROXY=http://host.docker.internal:3128 "
     "rhea-worker:latest "
 )
 

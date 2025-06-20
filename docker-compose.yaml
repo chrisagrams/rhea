@@ -7,6 +7,19 @@ services:
     volumes:
       - redis-data:/data
     restart: unless-stopped
+  
+  squid:
+    image: ubuntu/squid:latest
+    container_name: rhea-proxy
+    ports: 
+      - "3128:3128"
+    volumes:
+      - ./squid.conf:/etc/squid/squid.conf:ro
+      - squid-cache:/var/spool/squid
+    restart: unless-stopped
 
 volumes:
   redis-data:
+    name: rhea-redis-data
+  squid-cache:
+    name: rhea-squid-cache
