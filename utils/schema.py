@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import ClassVar, List, Optional, Sequence, Union, Dict
+from typing import ClassVar, List, Optional, Sequence, Union, Dict, Any
 from functools import wraps
 from pydantic import BaseModel, Field
 import xml.etree.ElementTree as ET
@@ -157,8 +157,7 @@ class ChangeFormat(BaseModel):
 
 class OutputFilter(BaseModel):
     """Represents a <filter> under data or collection"""
-
-    regex: str
+    code: str
 
 
 class DiscoverDatasets(BaseModel):
@@ -365,6 +364,64 @@ class AssertContents(BaseModel):
     @classmethod
     def xml_attrs_for(cls, field: str) -> Union[str, List[str]]:
         return cls._xml_attrs.get(field, [])
+    
+    
+    def run_all(self, input: bytes) -> None:
+        data = self.dict()
+        for field, entries in data.items():
+            if not entries:
+                continue
+
+            handler_name = f"_assert_{field}"
+            handler = getattr(self, handler_name, None)
+            if handler is None:
+                raise NotImplementedError(f"No handler implemented for '{field}'")
+            
+            for entry in entries:
+                if isinstance(entry, dict):
+                    params = entry
+                else:
+                    attrs = self.xml_attrs_for(field)
+                    params = {attrs[0]: entry} if attrs else {}
+                handler(input, **params)
+
+
+    def _assert_has_text(self, input: bytes, text: str, **kwargs):
+        subject = input.decode(encoding='utf-8')
+        if text not in subject:
+            raise AssertionError(f"Expected to find '{text}' in subject")
+        
+
+    def _assert_has_n_lines(
+        self,
+        input: bytes,
+        n: int,
+        delta: int = 0,
+        min: int | None = None,
+        max: int | None = None,
+        negate: bool = False,
+        **kwargs,
+    ):
+        subject = input.decode("utf-8")
+        count = subject.count("\n") + 1
+        expected = int(n)
+        d = int(delta) if delta is not None and delta != '' else 0
+        lower = expected - d
+        upper = expected + d
+        if min is not None and min != '':
+            lower = int(min)
+        if max is not None and max != '':
+            upper = int(max)
+        if negate:
+            if lower <= count <= upper:
+                raise AssertionError(
+                    f"Expected line count not in [{lower}, {upper}], got {count}"
+                )
+        else:
+            if count < lower or count > upper:
+                raise AssertionError(
+                    f"Expected line count in [{lower}, {upper}], got {count}"
+                )
 
 
 class DiscoveredDataset(BaseModel):
@@ -630,6 +687,14 @@ class Tool(BaseModel):
                         sort_by=dd_el.get("sort_by"),
                         visible=True if dd_el_visible == "true" else False if dd_el_visible is not None else None
                     )
+                
+                filters = None
+                filters_el = del_.findall("filter")
+                if filters_el is not None and len(filters_el) > 0:
+                    filters = []
+                    for filter in filters_el:
+                        filters.append(OutputFilter(code=filter.text or ""))
+
                 data.append(
                     DataOutput(
                         name=del_.get("name") or "",
@@ -637,7 +702,8 @@ class Tool(BaseModel):
                         label=del_.get("label") or "",
                         from_work_dir=del_.get("from_work_dir") or "",
                         change_format=cf,
-                        discover_datasets=dd
+                        discover_datasets=dd,
+                        filters=filters
                     )
                 )
 

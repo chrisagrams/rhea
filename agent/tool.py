@@ -89,15 +89,14 @@ class RheaBooleanParam(RheaParam):
 
     @classmethod
     def from_param(cls, param: Param, value: bool) -> "RheaBooleanParam":
-        if (
-            param.name is None
-            or param.type is None
-            or param.truevalue is None
-            or param.falsevalue is None
-        ):
+        if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         if param.value is None and param.checked is None:
             raise ValueError("Either 'value' or 'checked' must not be 'None'")
+        if param.truevalue is None:
+            param.truevalue = 'true'
+        if param.falsevalue is None:
+            param.falsevalue = 'false'
         return cls(
             name=param.name,
             type=param.type,
@@ -136,7 +135,7 @@ class RheaSelectParam(RheaParam):
         if param.options is None:
             raise ValueError("Param has no options.")
         for option in param.options:
-            if option.text == value:
+            if option.value == value:
                 return cls(name=param.name, type=param.type, value=option.value)
         raise ValueError(f"Value {value} not in select options.")
 
@@ -145,16 +144,24 @@ class RheaSelectParam(RheaParam):
 class RheaDataOutput:
     key: RedisKey
     size: int
+    filename: str
+    name: Optional[str] = None
 
     @classmethod
-    def from_file(cls, filepath: str, store: Store[RedisConnector]) -> "RheaDataOutput":
+    def from_file(cls, filepath: str, store: Store[RedisConnector], name: Optional[str] = None) -> "RheaDataOutput":
         with open(filepath, "rb") as f:
             buffer = f.read()
             proxy = store.proxy(buffer)
             key = get_key(proxy)
 
         size = os.path.getsize(filepath)
-        return cls(key=key, size=size)
+        filename = os.path.basename(filepath)
+        return cls(
+                key=key,
+                size=size,
+                filename=filename,
+                name=name
+            )
 
 
 class RheaOutput:
@@ -206,7 +213,12 @@ class RheaCollectionOuput(RheaOutput):
                         if rgx.match(file):
                             if self.files is None:
                                 self.files = []
-                            self.files.append(RheaDataOutput.from_file(file, store))
+                            name_match = rgx.match(os.path.basename(file))
+                            if name_match is not None:
+                                name = name_match.group(1)
+                            else:
+                                name = None
+                            self.files.append(RheaDataOutput.from_file(file, store, name=name))
                 else:
                     raise NotImplementedError(
                         f"Discover dataset method not implemented."
@@ -432,6 +444,8 @@ class RheaToolAgent(Behavior):
                         env[param.name] = value
                     elif isinstance(param, RheaTextParam):
                         env[param.name] = param.value
+                    elif isinstance(param, RheaSelectParam):
+                        env[param.name] = param.value
                 # Configure command script
                 cmd = " ".join(self.tool.command.split())  # Collapse to one line
                 cmd = self.expand_galaxy_if(cmd)
@@ -446,9 +460,10 @@ class RheaToolAgent(Behavior):
                 # Configure outputs
                 if self.tool.outputs.data is not None:
                     for out in self.tool.outputs.data:
-                        if out.from_work_dir is not None:
+                        if out.from_work_dir is None or out.from_work_dir == '':
+                            env[out.name] = os.path.join(output, out.name)
+                        else:
                             env[out.name] = os.path.join(output, out.from_work_dir)
-
                 # Run tool
                 cmd = [
                     "conda",
@@ -476,9 +491,18 @@ class RheaToolAgent(Behavior):
                     outputs.files = []
                     for out in self.tool.outputs.data:
                         if out.from_work_dir is not None:
-                            outputs.files.append(
-                                RheaDataOutput.from_file(env[out.name], output_store)
-                            )
+                            if out.filters is not None: #TODO: Actually apply the filters, for now just best-effort try to copy the file
+                                try:
+                                    outputs.files.append(
+                                        RheaDataOutput.from_file(env[out.name], output_store, name=out.name)
+                                    )
+                                except Exception:
+                                    pass
+                            else:
+                                outputs.files.append(
+                                    RheaDataOutput.from_file(env[out.name], output_store, name=out.name)
+                                )
+                            
                 elif self.tool.outputs.collection is not None:
                     outputs = RheaCollectionOuput(
                         return_code=result.returncode,
