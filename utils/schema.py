@@ -388,12 +388,27 @@ class AssertCommand(BaseModel):
     not_has_text: Optional[List[str]] = None
 
 
+class OutputCollectionElement(BaseModel):
+    name: Optional[str] = None
+    file: Optional[str] = None
+    element: Optional[OutputCollectionElement] = None
+    assert_contents: Optional[AssertContents] = None
+  
+
+class OutputCollection(BaseModel):
+    name: str
+    type: Optional[str] = None
+    count: Optional[int] = None
+    elements: Optional[List[OutputCollectionElement]] = None
+
+
 class Test(BaseModel):
     expect_num_outputs: int
     params: Optional[List[Param]] = None
     conditional: Optional[Conditional] = None
     outputs: Optional[List[TestOutput]] = None
     assert_command: Optional[AssertCommand] = None
+    output_collection: Optional[OutputCollection] = None
 
 
 class Tests(BaseModel):
@@ -704,71 +719,49 @@ class Tool(BaseModel):
                     )
 
                 # Outputs in test
+
+                def parse_assert_contents(element: Optional[ET.Element]) -> Optional[AssertContents]:
+                    if element is None:
+                        return None
+
+                    ac_data: Dict[str, Union[List[str], List[Dict[str, str]], None]] = {}
+                    for name in AssertContents.__fields__:
+                        attrs = AssertContents.xml_attrs_for(name)
+                        elems = element.findall(name)
+                        if not elems:
+                            ac_data[name] = None
+                            continue
+
+                        if isinstance(attrs, str):
+                            vals = [el.get(attrs) or "" for el in elems]
+                        else:
+                            if not attrs:
+                                vals = [{} for _ in elems]
+                            else:
+                                vals = [
+                                    {a: el.get(a) or "" for a in attrs}
+                                    for el in elems
+                                ]
+
+                        ac_data[name] = vals or None
+
+                    return AssertContents(**ac_data)
+                
                 touts: list[TestOutput] = []
                 for oel in tel.findall("output"):
-                    # Direct assert_contents
-                    ac_el = oel.find("assert_contents")
-                    ac = None
-                    if ac_el is not None:
-                        ac_data: Dict[
-                            str, Union[List[str], List[Dict[str, str]], None]
-                        ] = {}
-                        for name in AssertContents.__fields__:
-                            attrs = AssertContents.xml_attrs_for(name)
-                            elems = ac_el.findall(name)
-                            if not elems:
-                                ac_data[name] = None
-                                continue
+                    ac = parse_assert_contents(oel.find("assert_contents"))
 
-                            if isinstance(attrs, str):
-                                vals = [el.get(attrs) or "" for el in elems]
-                            else:
-                                if not attrs:
-                                    vals = [{} for _ in elems]
-                                else:
-                                    vals = [
-                                        {a: (el.get(a) or "") for a in attrs}
-                                        for el in elems
-                                    ]
-
-                            ac_data[name] = vals or None
-
-                        ac = AssertContents(**ac_data)
-
-                    # Discovered_dataset nested inside <output>
                     ds_el = oel.find("discovered_dataset")
-                    ds = None
                     if ds_el is not None:
-                        ds_data: Dict[
-                            str, Union[List[str], List[Dict[str, str]], None]
-                        ] = {}
-                        for name in AssertContents.__fields__:
-                            attrs = AssertContents.xml_attrs_for(name)
-                            elems = ds_el.findall(name)
-                            if not elems:
-                                ds_data[name] = None
-                                continue
-
-                            if isinstance(attrs, str):
-                                vals = [el.get(attrs) or "" for el in elems]
-                            else:
-                                if not attrs:
-                                    vals = [{} for _ in elems]
-                                else:
-                                    vals = [
-                                        {a: (el.get(a) or "") for a in attrs}
-                                        for el in elems
-                                    ]
-
-                            ds_data[name] = vals or None
-
-                        dd_ac = AssertContents(**ds_data)
+                        dd_ac = parse_assert_contents(ds_el)
                         ds = DiscoveredDataset(
                             designation=ds_el.get("designation") or "",
                             ftype=ds_el.get("ftype") or "",
                             assert_contents=dd_ac,
                         )
-
+                    else:
+                        ds = None
+                
                     # Metadata placeholder
                     md_el = oel.find("metadata")
                     md = md_el.text if md_el is not None else None
@@ -786,6 +779,7 @@ class Tool(BaseModel):
                     )
 
                 # Assert command
+
                 acmd_el = tel.find("assert_command")
                 acmd = None
                 if acmd_el is not None:
@@ -797,6 +791,36 @@ class Tool(BaseModel):
                         has_text=has_ or None, not_has_text=not_ or None
                     )
 
+                # Output collection in test
+
+                def parse_output_collection_element(el: ET.Element) -> OutputCollectionElement:
+                    oce = OutputCollectionElement(
+                        name = el.get("name"),
+                        file = el.get("file")
+                    )
+                    oce_subel = el.find("element")
+                    if oce_subel is not None:
+                        oce.element = parse_output_collection_element(oce_subel)
+                    oce.assert_contents = parse_assert_contents(el.find("assert_contents"))
+
+                    return oce
+
+
+                oc_el = tel.find("output_collection")
+                oc = None
+                if oc_el is not None:
+                    count = oc_el.get('count')
+                    oc = OutputCollection(
+                        name=oc_el.get('name') or '',
+                        type=oc_el.get('type'),
+                        count=int(count) if count is not None else None
+                    )
+                    oc_elem_els = oc_el.findall("element")
+                    if oc_elem_els is not None:
+                        oc.elements = []
+                        for oc_elem_el in oc_elem_els:
+                            oc.elements.append(parse_output_collection_element(oc_elem_el))
+
                 test_list.append(
                     Test(
                         expect_num_outputs=expect,
@@ -804,6 +828,7 @@ class Tool(BaseModel):
                         conditional=tcond,
                         outputs=touts or None,
                         assert_command=acmd,
+                        output_collection=oc
                     )
                 )
         tests = Tests(tests=test_list)
