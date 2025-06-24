@@ -116,6 +116,14 @@ class Macros(BaseModel):
         return tool_xml
 
 
+class ConfigFile(BaseModel):
+    name: str
+    text: str
+
+
+class ConfigFiles(BaseModel):
+    configfiles: Optional[List[ConfigFile]] = None
+
 class Xref(BaseModel):
     type: str
     value: str
@@ -525,6 +533,7 @@ class Tool(BaseModel):
     stdio: Stdio
     version_command: str
     command: str
+    configfiles: Optional[ConfigFiles] = None
     inputs: Inputs
     outputs: Outputs
     tests: Tests
@@ -633,6 +642,20 @@ class Tool(BaseModel):
             command = cmd_el.text or ""
         else:
             command = ""
+
+        # Configfiles
+        config_files = None
+        cfs_el = root.find("configfiles")
+        if cfs_el is not None:
+            cf_els = cfs_el.findall("configfile")
+            if cf_els is not None:
+                configfiles = []
+                for cf_el in cf_els:
+                    configfiles.append(
+                        ConfigFile(name=cf_el.get("name") or "", text=cf_el.text or "")
+                    )
+                config_files = ConfigFiles(configfiles=configfiles)
+            
 
         # Inputs
         inputs_el = root.find("inputs")
@@ -1014,6 +1037,7 @@ class Tool(BaseModel):
             requirements=requirements,
             stdio=stdio,
             version_command=version_command,
+            configfiles=config_files,
             command=command,
             inputs=inputs,
             outputs=outputs,
