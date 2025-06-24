@@ -78,8 +78,7 @@ if __name__ == "__main__":
     # tool = tools["593966108c52c584"]
     # tool = tools["f69b601af5ce77b7"]
     tool = tools["c198b9ec43cfbe0e"]
-    
-    tool_results = run_tool_tests(tool)
 
+    tool_results = run_tool_tests(tool)
 
     parsl.dfk().cleanup()

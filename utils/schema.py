@@ -158,6 +158,7 @@ class ChangeFormat(BaseModel):
 
 class OutputFilter(BaseModel):
     """Represents a <filter> under data or collection"""
+
     code: str
 
 
@@ -220,7 +221,6 @@ class CollectionOutput(BaseModel):
     label: str
     data: List[CollectionData]
     discover_datasets: Optional[DiscoverDatasets] = None
-
 
 
 class Outputs(BaseModel):
@@ -365,8 +365,7 @@ class AssertContents(BaseModel):
     @classmethod
     def xml_attrs_for(cls, field: str) -> Union[str, List[str]]:
         return cls._xml_attrs.get(field, [])
-    
-    
+
     def run_all(self, input: bytes) -> None:
         data = self.dict()
         for field, entries in data.items():
@@ -377,7 +376,7 @@ class AssertContents(BaseModel):
             handler = getattr(self, handler_name, None)
             if handler is None:
                 raise NotImplementedError(f"No handler implemented for '{field}'")
-            
+
             for entry in entries:
                 if isinstance(entry, dict):
                     params = entry
@@ -386,12 +385,10 @@ class AssertContents(BaseModel):
                     params = {attrs[0]: entry} if attrs else {}
                 handler(input, **params)
 
-
     def _assert_has_text(self, input: bytes, text: str, **kwargs):
-        subject = input.decode(encoding='utf-8')
+        subject = input.decode(encoding="utf-8")
         if text not in subject:
             raise AssertionError(f"Expected to find '{text}' in subject")
-        
 
     def _assert_has_n_lines(
         self,
@@ -406,12 +403,12 @@ class AssertContents(BaseModel):
         subject = input.decode("utf-8")
         count = subject.count("\n") + 1
         expected = int(n)
-        d = int(delta) if delta is not None and delta != '' else 0
+        d = int(delta) if delta is not None and delta != "" else 0
         lower = expected - d
         upper = expected + d
-        if min is not None and min != '':
+        if min is not None and min != "":
             lower = int(min)
-        if max is not None and max != '':
+        if max is not None and max != "":
             upper = int(max)
         if negate:
             if lower <= count <= upper:
@@ -423,7 +420,7 @@ class AssertContents(BaseModel):
                 raise AssertionError(
                     f"Expected line count in [{lower}, {upper}], got {count}"
                 )
-    
+
     def _assert_has_line_matching(
         self,
         input: bytes,
@@ -441,12 +438,12 @@ class AssertContents(BaseModel):
         count = sum(1 for line in lines if pattern.search(line))
 
         expected = int(n)
-        d = int(delta) if delta not in (None, '') else 0
+        d = int(delta) if delta not in (None, "") else 0
         lower = expected - d
         upper = expected + d
-        if min not in (None, ''):
+        if min not in (None, ""):
             lower = int(min)
-        if max not in (None, ''):
+        if max not in (None, ""):
             upper = int(max)
 
         if negate:
@@ -459,12 +456,13 @@ class AssertContents(BaseModel):
                 raise AssertionError(
                     f"Expected number of matching lines in [{lower}, {upper}], but got {count}"
                 )
-    
+
     def _assert_is_valid_xml(self, input: bytes, **kwargs):
         try:
             ET.fromstring(input.decode("utf-8"))
         except ET.ParseError as e:
             raise AssertionError(f"Invalid XML: {e}")
+
 
 class DiscoveredDataset(BaseModel):
     designation: str
@@ -492,7 +490,7 @@ class OutputCollectionElement(BaseModel):
     file: Optional[str] = None
     element: Optional[OutputCollectionElement] = None
     assert_contents: Optional[AssertContents] = None
-  
+
 
 class OutputCollection(BaseModel):
     name: str
@@ -718,18 +716,38 @@ class Tool(BaseModel):
                     dd_el_mrp = dd_el.get("match_relative_path")
                     dd_el_visible = dd_el.get("visible")
                     dd = DiscoverDatasets(
-                        assign_primary_output=True if dd_el_apo == "true" else False if dd_el_apo is not None else None,
-                        from_provided_metadata=True if dd_el_fpm == "true" else False if dd_el_fpm is not None else None,
+                        assign_primary_output=(
+                            True
+                            if dd_el_apo == "true"
+                            else False if dd_el_apo is not None else None
+                        ),
+                        from_provided_metadata=(
+                            True
+                            if dd_el_fpm == "true"
+                            else False if dd_el_fpm is not None else None
+                        ),
                         pattern=dd_el.get("pattern"),
                         directory=dd_el.get("directory"),
-                        recurse=True if dd_el_recurse == "true" else False if dd_el_recurse is not None else None,
-                        match_relative_path=True if dd_el_mrp == "true" else False if dd_el_mrp is not None else None,
+                        recurse=(
+                            True
+                            if dd_el_recurse == "true"
+                            else False if dd_el_recurse is not None else None
+                        ),
+                        match_relative_path=(
+                            True
+                            if dd_el_mrp == "true"
+                            else False if dd_el_mrp is not None else None
+                        ),
                         format=dd_el.get("format"),
                         ext=dd_el.get("ext"),
                         sort_by=dd_el.get("sort_by"),
-                        visible=True if dd_el_visible == "true" else False if dd_el_visible is not None else None
+                        visible=(
+                            True
+                            if dd_el_visible == "true"
+                            else False if dd_el_visible is not None else None
+                        ),
                     )
-                
+
                 filters = None
                 filters_el = del_.findall("filter")
                 if filters_el is not None and len(filters_el) > 0:
@@ -745,7 +763,7 @@ class Tool(BaseModel):
                         from_work_dir=del_.get("from_work_dir") or "",
                         change_format=cf,
                         discover_datasets=dd,
-                        filters=filters
+                        filters=filters,
                     )
                 )
 
@@ -768,16 +786,36 @@ class Tool(BaseModel):
                     dd_el_mrp = dd_el.get("match_relative_path")
                     dd_el_visible = dd_el.get("visible")
                     dd = DiscoverDatasets(
-                        assign_primary_output=True if dd_el_apo == "true" else False if dd_el_apo is not None else None,
-                        from_provided_metadata=True if dd_el_fpm == "true" else False if dd_el_fpm is not None else None,
+                        assign_primary_output=(
+                            True
+                            if dd_el_apo == "true"
+                            else False if dd_el_apo is not None else None
+                        ),
+                        from_provided_metadata=(
+                            True
+                            if dd_el_fpm == "true"
+                            else False if dd_el_fpm is not None else None
+                        ),
                         pattern=dd_el.get("pattern"),
                         directory=dd_el.get("directory"),
-                        recurse=True if dd_el_recurse == "true" else False if dd_el_recurse is not None else None,
-                        match_relative_path=True if dd_el_mrp == "true" else False if dd_el_mrp is not None else None,
+                        recurse=(
+                            True
+                            if dd_el_recurse == "true"
+                            else False if dd_el_recurse is not None else None
+                        ),
+                        match_relative_path=(
+                            True
+                            if dd_el_mrp == "true"
+                            else False if dd_el_mrp is not None else None
+                        ),
                         format=dd_el.get("format"),
                         ext=dd_el.get("ext"),
                         sort_by=dd_el.get("sort_by"),
-                        visible=True if dd_el_visible == "true" else False if dd_el_visible is not None else None
+                        visible=(
+                            True
+                            if dd_el_visible == "true"
+                            else False if dd_el_visible is not None else None
+                        ),
                     )
                 collection.append(
                     CollectionOutput(
@@ -785,7 +823,7 @@ class Tool(BaseModel):
                         type=cel.get("type") or "",
                         label=cel.get("label") or "",
                         data=collection_data,
-                        discover_datasets=dd
+                        discover_datasets=dd,
                     )
                 )
 
@@ -828,11 +866,15 @@ class Tool(BaseModel):
 
                 # Outputs in test
 
-                def parse_assert_contents(element: Optional[ET.Element]) -> Optional[AssertContents]:
+                def parse_assert_contents(
+                    element: Optional[ET.Element],
+                ) -> Optional[AssertContents]:
                     if element is None:
                         return None
 
-                    ac_data: Dict[str, Union[List[str], List[Dict[str, str]], None]] = {}
+                    ac_data: Dict[str, Union[List[str], List[Dict[str, str]], None]] = (
+                        {}
+                    )
                     for name in AssertContents.__fields__:
                         attrs = AssertContents.xml_attrs_for(name)
                         elems = element.findall(name)
@@ -847,14 +889,13 @@ class Tool(BaseModel):
                                 vals = [{} for _ in elems]
                             else:
                                 vals = [
-                                    {a: el.get(a) or "" for a in attrs}
-                                    for el in elems
+                                    {a: el.get(a) or "" for a in attrs} for el in elems
                                 ]
 
                         ac_data[name] = vals or None
 
                     return AssertContents(**ac_data)
-                
+
                 touts: list[TestOutput] = []
                 for oel in tel.findall("output"):
                     ac = parse_assert_contents(oel.find("assert_contents"))
@@ -869,7 +910,7 @@ class Tool(BaseModel):
                         )
                     else:
                         ds = None
-                
+
                     # Metadata placeholder
                     md_el = oel.find("metadata")
                     md = md_el.text if md_el is not None else None
@@ -901,33 +942,37 @@ class Tool(BaseModel):
 
                 # Output collection in test
 
-                def parse_output_collection_element(el: ET.Element) -> OutputCollectionElement:
+                def parse_output_collection_element(
+                    el: ET.Element,
+                ) -> OutputCollectionElement:
                     oce = OutputCollectionElement(
-                        name = el.get("name"),
-                        file = el.get("file")
+                        name=el.get("name"), file=el.get("file")
                     )
                     oce_subel = el.find("element")
                     if oce_subel is not None:
                         oce.element = parse_output_collection_element(oce_subel)
-                    oce.assert_contents = parse_assert_contents(el.find("assert_contents"))
+                    oce.assert_contents = parse_assert_contents(
+                        el.find("assert_contents")
+                    )
 
                     return oce
-
 
                 oc_el = tel.find("output_collection")
                 oc = None
                 if oc_el is not None:
-                    count = oc_el.get('count')
+                    count = oc_el.get("count")
                     oc = OutputCollection(
-                        name=oc_el.get('name') or '',
-                        type=oc_el.get('type'),
-                        count=int(count) if count is not None else None
+                        name=oc_el.get("name") or "",
+                        type=oc_el.get("type"),
+                        count=int(count) if count is not None else None,
                     )
                     oc_elem_els = oc_el.findall("element")
                     if oc_elem_els is not None:
                         oc.elements = []
                         for oc_elem_el in oc_elem_els:
-                            oc.elements.append(parse_output_collection_element(oc_elem_el))
+                            oc.elements.append(
+                                parse_output_collection_element(oc_elem_el)
+                            )
 
                 test_list.append(
                     Test(
@@ -936,7 +981,7 @@ class Tool(BaseModel):
                         conditional=tcond,
                         outputs=touts or None,
                         assert_command=acmd,
-                        output_collection=oc
+                        output_collection=oc,
                     )
                 )
         tests = Tests(tests=test_list)
