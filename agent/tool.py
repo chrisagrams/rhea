@@ -199,7 +199,7 @@ class RheaSelectParam(RheaParam):
 
 class RheaMultiSelectParam(RheaParam):
     def __init__(
-            self, name: str, type: str, values: List[str], argument: str | None = None
+            self, name: str, type: str, values: List[RheaSelectParam], argument: str | None = None
     ) -> None:
         super().__init__(name, type, argument)
         self.values = values
@@ -467,7 +467,10 @@ class RheaToolAgent(Behavior):
                     elif isinstance(p, (RheaSelectParam, RheaTextParam)):
                         lit = p.value
                     elif isinstance(p, RheaMultiSelectParam):
-                        lit = ",".join(p.values) # TODO: Check if this is correct
+                        vals = []
+                        for _p in p.values:
+                            vals.append(_p.value)
+                        lit = ",".join(vals) # TODO: Check if this is correct
                     elif isinstance(p, RheaFileParam):
                         lit = str(p.value)
                     else:
@@ -571,7 +574,10 @@ class RheaToolAgent(Behavior):
                     elif isinstance(param, RheaSelectParam):
                         env[param.name] = param.value
                     elif isinstance(param, RheaMultiSelectParam):
-                        env[param.name] = ",".join(param.values) # TODO: Check if this is correct
+                        values = []
+                        for p in param.values:
+                            values.append(p.value)
+                        env[param.name] = ",".join(values) # TODO: Check if this is correct
                 # Configure command script
                 cmd = self.expand_galaxy_if(self.tool.command, params)
                 cmd = " ".join(cmd.split())  # Collapse to one line
