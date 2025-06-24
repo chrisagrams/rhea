@@ -315,7 +315,6 @@ class RheaToolAgent(Behavior):
     ) -> None:
         super().__init__()
         self.tool: Tool = tool
-        self.python_verion: str = "3.8"
         self.installed_packages: List[str]
         self.connector = RedisConnector(redis_host, redis_port)
         self.replace_galaxy_var(
@@ -336,20 +335,7 @@ class RheaToolAgent(Behavior):
         )
 
     def on_setup(self) -> None:
-        # Create Conda environment
-        cmd = [
-            "conda",
-            "create",
-            "-n",
-            self.tool.id,
-            f"python={self.python_verion}",
-            "-y",
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Error creating Conda environment: {result.stdout}")
-
-        # Install Conda packages
+        # Create Conda environment and install Conda packages 
         requirements = self.tool.requirements.requirements
         packages = []
         for requirement in requirements:
@@ -360,7 +346,7 @@ class RheaToolAgent(Behavior):
                     f'Requirement type of "{requirement.type}" not yet implemented.'
                 )
         try:
-            cmd = ["conda", "install", "-n", self.tool.id, "-y"] + packages
+            cmd = ["conda", "create", "-n", self.tool.id, "-y"] + packages
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Error installing Conda packages: {result.stdout}")
