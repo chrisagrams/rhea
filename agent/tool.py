@@ -34,6 +34,24 @@ class RheaParam:
             if type(value) is not str:
                 raise ValueError("Value must be a 'str' for text param.")
             return RheaTextParam.from_param(param, value)
+        elif param.type == "integer": # RheaIntegerParam
+            if isinstance(value, str):
+                try:
+                    value = int(value)
+                except ValueError:
+                    raise ValueError("Value must be an 'int' or string castable to 'int' for integer param.")
+            if not isinstance(value, int):
+                raise ValueError("Value must be an 'int' for integer param.")
+            return RheaIntegerParam.from_param(param, value)
+        elif param.type == "float": # RheaFloatParam
+            if isinstance(value, str):
+                try:
+                    value = float(value)
+                except ValueError:
+                    raise ValueError("Value must be a 'float' or string castable to 'float' for float param.")
+            if not isinstance(value, float):
+                raise ValueError("Value must be a 'float' for float param.")
+            return RheaFloatParam.from_param(param, value)
         elif param.type == "boolean":
             if type(value) is not bool:
                 if value.lower() == "true":
@@ -120,6 +138,38 @@ class RheaTextParam(RheaParam):
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value)
 
+
+class RheaIntegerParam(RheaParam):
+    def __init__(
+            self, name: str, type: str, value: int, min: int | None = None, max: int | None = None, argument: str | None = None,
+    ) -> None: 
+        super().__init__(name, type, argument)
+        self.value = value
+        self.min = min
+        self.max = max
+    
+    @classmethod
+    def from_param(cls, param: Param, value: int, min: int | None = None, max: int | None = None) -> "RheaIntegerParam":
+        if param.name is None or param.type is None:
+            raise ValueError("Required fields are 'None'")
+        return cls(name=param.name, type=param.type, value=value, min=min, max=max)
+    
+
+class RheaFloatParam(RheaParam):
+    def __init__(
+            self, name: str, type: str, value: float, min: float | None = None, max: float | None = None, argument: str | None = None,
+    ) -> None:
+        super().__init__(name, type, argument)
+        self.value = value
+        self.min = min
+        self.max = max
+
+    @classmethod 
+    def from_param(cls, param: Param, value: float, min: float | None = None, max: float | None = None) -> "RheaFloatParam":
+        if param.name is None or param.type is None:
+            raise ValueError("Required fields are 'None'")
+        return cls(name=param.name, type=param.type, value=value, min=min, max=max)
+        
 
 class RheaSelectParam(RheaParam):
     def __init__(
@@ -502,6 +552,10 @@ class RheaToolAgent(Behavior):
                         env[param.name] = value
                     elif isinstance(param, RheaTextParam):
                         env[param.name] = param.value
+                    elif isinstance(param, RheaIntegerParam):
+                        env[param.name] = str(param.value)
+                    elif isinstance(param, RheaFloatParam):
+                        env[param.name] = str(param.value)
                     elif isinstance(param, RheaSelectParam):
                         env[param.name] = param.value
                 # Configure command script
