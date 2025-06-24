@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "minio>=7.2.15",
-    "parsl>=2025.6.16",
+    "mypy>=1.16.1",
+    "parsl>=2025.6.23",
     "proxystore[all]>=0.8.2",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
 ]
