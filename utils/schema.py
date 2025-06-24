@@ -241,6 +241,7 @@ class Param(BaseModel):
     format: Optional[str] = None
     label: Optional[str] = None
     help: Optional[str] = None
+    multiple: Optional[bool] = None
     optional: Optional[bool] = None
     value: Optional[str] = None
     truevalue: Optional[str] = None
@@ -653,6 +654,7 @@ class Tool(BaseModel):
                 format=el.get("format"),
                 label=el.get("label"),
                 help=el.get("help"),
+                multiple=(el.get("multiple") == "True"),
                 optional=(el.get("optional") == "True"),
                 value=el.get("value"),
                 truevalue=el.get("truevalue"),
