@@ -61,6 +61,13 @@ class RheaParam:
                 else:
                     raise ValueError("Value must be a 'bool' for boolean param.")
             return RheaBooleanParam.from_param(param, value)
+        elif param.type == "select" and param.multiple:
+            if type(value) is not str:
+                raise ValueError("Value must be a 'str' for select param.")
+            values = value.split(",")
+            if len(value) < 1:
+                raise ValueError("Unpacked params is empty.")
+            return RheaMultiSelectParam.from_param(param, values)
         elif param.type == "select":
             if type(value) is not str:
                 raise ValueError("Value must be a 'str' for select param.")
@@ -189,6 +196,23 @@ class RheaSelectParam(RheaParam):
                 return cls(name=param.name, type=param.type, value=option.value)
         raise ValueError(f"Value {value} not in select options.")
 
+
+class RheaMultiSelectParam(RheaParam):
+    def __init__(
+            self, name: str, type: str, values: List[str], argument: str | None = None
+    ) -> None:
+        super().__init__(name, type, argument)
+        self.values = values
+    
+    @classmethod
+    def from_param(cls, param: Param, value: List[str]) -> "RheaMultiSelectParam":
+        if param.name is None or param.type is None:
+            raise ValueError("Required fields are 'None'")
+        res = []
+        for val in value:
+            res.append(RheaSelectParam.from_param(param, val))
+        return cls(name=param.name, type=param.type, values=res)
+    
 
 @dataclass
 class RheaDataOutput:
@@ -456,6 +480,8 @@ class RheaToolAgent(Behavior):
                         lit = p.truevalue if p.value else p.falsevalue
                     elif isinstance(p, (RheaSelectParam, RheaTextParam)):
                         lit = p.value
+                    elif isinstance(p, RheaMultiSelectParam):
+                        lit = ",".join(p.values) # TODO: Check if this is correct
                     elif isinstance(p, RheaFileParam):
                         lit = str(p.value)
                     else:
@@ -558,6 +584,8 @@ class RheaToolAgent(Behavior):
                         env[param.name] = str(param.value)
                     elif isinstance(param, RheaSelectParam):
                         env[param.name] = param.value
+                    elif isinstance(param, RheaMultiSelectParam):
+                        env[param.name] = ",".join(param.values) # TODO: Check if this is correct
                 # Configure command script
                 cmd = self.expand_galaxy_if(self.tool.command, params)
                 cmd = " ".join(cmd.split())  # Collapse to one line
