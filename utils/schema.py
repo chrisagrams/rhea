@@ -4,6 +4,7 @@ from functools import wraps
 from pydantic import BaseModel, Field
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import re
 
 
 class XmlNode(BaseModel):
@@ -422,7 +423,48 @@ class AssertContents(BaseModel):
                 raise AssertionError(
                     f"Expected line count in [{lower}, {upper}], got {count}"
                 )
+    
+    def _assert_has_line_matching(
+        self,
+        input: bytes,
+        expression: str,
+        n: int = 1,
+        delta: int = 0,
+        min: int | None = None,
+        max: int | None = None,
+        negate: bool = False,
+        **kwargs,
+    ):
+        lines = input.decode("utf-8").splitlines()
+        pattern = re.compile(expression)
 
+        count = sum(1 for line in lines if pattern.search(line))
+
+        expected = int(n)
+        d = int(delta) if delta not in (None, '') else 0
+        lower = expected - d
+        upper = expected + d
+        if min not in (None, ''):
+            lower = int(min)
+        if max not in (None, ''):
+            upper = int(max)
+
+        if negate:
+            if lower <= count <= upper:
+                raise AssertionError(
+                    f"Expected number of matching lines NOT in [{lower}, {upper}], but got {count}"
+                )
+        else:
+            if count < lower or count > upper:
+                raise AssertionError(
+                    f"Expected number of matching lines in [{lower}, {upper}], but got {count}"
+                )
+    
+    def _assert_is_valid_xml(self, input: bytes, **kwargs):
+        try:
+            ET.fromstring(input.decode("utf-8"))
+        except ET.ParseError as e:
+            raise AssertionError(f"Invalid XML: {e}")
 
 class DiscoveredDataset(BaseModel):
     designation: str
