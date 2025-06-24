@@ -374,7 +374,7 @@ class RheaToolAgent(Behavior):
                 resp.release_conn()
 
         return dir
-
+    
     def replace_galaxy_var(self, var: str, value: Optional[int] = None) -> None:
         """
         Replace occurrences of "\${VAR:-Z}" (with or without surrounding quotes) in `script`.
@@ -388,12 +388,71 @@ class RheaToolAgent(Behavior):
 
         self.tool.command = pattern.sub(_repl, self.tool.command)
 
-    def expand_galaxy_if(self, cmd: str) -> str:
-        """
-        TODO Have this actually expand the if statements
-        """
-        pattern = re.compile(r"#if\b.*?#end(?:\s*if)?\b", flags=re.IGNORECASE)
-        return pattern.sub("", cmd).strip()
+
+    def expand_galaxy_if(self, cmd: str, params: List[RheaParam]) -> str:
+        lines = cmd.splitlines()
+        processed: List[tuple[str, bool]] = []
+        stack = [True]
+        pmap = {p.name: p for p in params}
+
+        for line in lines:
+            # inline "#if"
+            m = re.search(r"#if\s+(.*?):", line, flags=re.IGNORECASE)
+            if m:
+                prefix = line[:m.start()].rstrip()
+                if prefix and stack[-1]:
+                    processed.append((prefix, False))
+                cond = m.group(1)
+                for name, p in pmap.items():
+                    if isinstance(p, RheaBooleanParam):
+                        lit = p.truevalue if p.value else p.falsevalue
+                    elif isinstance(p, (RheaSelectParam, RheaTextParam)):
+                        lit = p.value
+                    elif isinstance(p, RheaFileParam):
+                        lit = str(p.value)
+                    else:
+                        raise NotImplementedError(type(p))
+                    cond = cond.replace(f"${name}", repr(lit))
+                try:
+                    keep = bool(eval(cond, {"str": str}))
+                except Exception:
+                    keep = False
+                stack.append(stack[-1] and keep)
+                continue
+
+            # end of block
+            if re.search(r"#end(?:\s*if)?\b", line, flags=re.IGNORECASE):
+                if len(stack) > 1:
+                    stack.pop()
+                continue
+
+            # normal line
+            if stack[-1]:
+                in_if = len(stack) > 1
+                processed.append((line, in_if))
+
+        # final substitution only inside if-blocks
+        var_pattern = re.compile(r"\$(\w+)")
+        result_lines: List[str] = []
+        for text, in_if in processed:
+            if in_if:
+                def repl(m: re.Match) -> str:
+                    name = m.group(1)
+                    p = pmap.get(name)
+                    if not p:
+                        return m.group(0)
+                    if isinstance(p, RheaBooleanParam):
+                        return p.truevalue if p.value else p.falsevalue
+                    if isinstance(p, (RheaSelectParam, RheaTextParam)):
+                        return str(p.value or "")
+                    if isinstance(p, RheaFileParam):
+                        return m.group(0)  # leave $var untouched
+                    return m.group(0)
+                text = var_pattern.sub(repl, text)
+            result_lines.append(text)
+
+        return " ".join(result_lines).strip()
+
 
     def unescape_bash_vars(self, cmd: str) -> str:
         """
@@ -447,8 +506,8 @@ class RheaToolAgent(Behavior):
                     elif isinstance(param, RheaSelectParam):
                         env[param.name] = param.value
                 # Configure command script
-                cmd = " ".join(self.tool.command.split())  # Collapse to one line
-                cmd = self.expand_galaxy_if(cmd)
+                cmd = self.expand_galaxy_if(self.tool.command, params)
+                cmd = " ".join(cmd.split())  # Collapse to one line
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
                 with NamedTemporaryFile("w", suffix=".sh", delete=False) as tf:
