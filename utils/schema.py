@@ -664,7 +664,7 @@ class Tool(BaseModel):
             opts = [
                 Option(
                     value=o.get("value") or "",
-                    selected=(o.get("selected") == True),
+                    selected=(o.get("selected") == "True" or o.get("selected") == "true"),
                     text=o.text,
                 )
                 for o in el.findall("option")
@@ -677,12 +677,12 @@ class Tool(BaseModel):
                 format=el.get("format"),
                 label=el.get("label"),
                 help=el.get("help"),
-                multiple=(el.get("multiple") == "True"),
-                optional=(el.get("optional") == "True"),
+                multiple=(el.get("multiple") == "True" or el.get("multiple") == "true"),
+                optional=(el.get("optional") == "True" or el.get("optional") == "true"),
                 value=el.get("value"),
                 truevalue=el.get("truevalue"),
                 falsevalue=el.get("falsevalue"),
-                checked=(el.get("checked") == "True"),
+                checked=(el.get("checked") == "True" or el.get("checked") == "true"),
                 options=opts,
             )
 
@@ -743,24 +743,24 @@ class Tool(BaseModel):
                     dd = DiscoverDatasets(
                         assign_primary_output=(
                             True
-                            if dd_el_apo == "true"
+                            if dd_el_apo == "true" or dd_el_apo == "True"
                             else False if dd_el_apo is not None else None
                         ),
                         from_provided_metadata=(
                             True
-                            if dd_el_fpm == "true"
+                            if dd_el_fpm == "true" or dd_el_fpm == "True"
                             else False if dd_el_fpm is not None else None
                         ),
                         pattern=dd_el.get("pattern"),
                         directory=dd_el.get("directory"),
                         recurse=(
                             True
-                            if dd_el_recurse == "true"
+                            if dd_el_recurse == "true" or dd_el_recurse == "True"
                             else False if dd_el_recurse is not None else None
                         ),
                         match_relative_path=(
                             True
-                            if dd_el_mrp == "true"
+                            if dd_el_mrp == "true" or dd_el_mrp == "True"
                             else False if dd_el_mrp is not None else None
                         ),
                         format=dd_el.get("format"),
@@ -768,7 +768,7 @@ class Tool(BaseModel):
                         sort_by=dd_el.get("sort_by"),
                         visible=(
                             True
-                            if dd_el_visible == "true"
+                            if dd_el_visible == "true" or dd_el_visible == "True"
                             else False if dd_el_visible is not None else None
                         ),
                     )
@@ -813,24 +813,24 @@ class Tool(BaseModel):
                     dd = DiscoverDatasets(
                         assign_primary_output=(
                             True
-                            if dd_el_apo == "true"
+                            if dd_el_apo == "true" or dd_el_apo == "True"
                             else False if dd_el_apo is not None else None
                         ),
                         from_provided_metadata=(
                             True
-                            if dd_el_fpm == "true"
+                            if dd_el_fpm == "true" or dd_el_fpm == "True"
                             else False if dd_el_fpm is not None else None
                         ),
                         pattern=dd_el.get("pattern"),
                         directory=dd_el.get("directory"),
                         recurse=(
                             True
-                            if dd_el_recurse == "true"
+                            if dd_el_recurse == "true" or dd_el_recurse == "True"
                             else False if dd_el_recurse is not None else None
                         ),
                         match_relative_path=(
                             True
-                            if dd_el_mrp == "true"
+                            if dd_el_mrp == "true" or dd_el_mrp == "True"
                             else False if dd_el_mrp is not None else None
                         ),
                         format=dd_el.get("format"),
@@ -838,7 +838,7 @@ class Tool(BaseModel):
                         sort_by=dd_el.get("sort_by"),
                         visible=(
                             True
-                            if dd_el_visible == "true"
+                            if dd_el_visible == "true" or dd_el_visible == "True"
                             else False if dd_el_visible is not None else None
                         ),
                     )
