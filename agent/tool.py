@@ -12,6 +12,9 @@ from proxystore.store.utils import get_key
 from tempfile import TemporaryDirectory, NamedTemporaryFile, mkdtemp
 from minio import Minio
 from dataclasses import dataclass
+from Cheetah.Template import Template
+from types import SimpleNamespace
+
 
 
 class RheaParam:
@@ -453,78 +456,34 @@ class RheaToolAgent(Behavior):
 
         self.tool.command = pattern.sub(_repl, self.tool.command)
 
-    def expand_galaxy_if(self, cmd: str, params: List[RheaParam]) -> str:
-        lines = cmd.splitlines()
-        processed: List[tuple[str, bool]] = []
-        stack = [True]
-        pmap = {p.name: p for p in params}
+    def expand_galaxy_if(self, cmd: str, env: dict[str, str]) -> str:
+        context: dict[str, Any] = {}
+        for full_name, value in env.items():
+            parts = full_name.split('.')
+            cur = context
+            for p in parts[:-1]:
+                cur = cur.setdefault(p, {})
+            cur[parts[-1]] = value
 
-        for line in lines:
-            # inline "#if"
-            m = re.search(r"#if\s+(.*?):", line, flags=re.IGNORECASE)
-            if m:
-                prefix = line[: m.start()].rstrip()
-                if prefix and stack[-1]:
-                    processed.append((prefix, False))
-                cond = m.group(1)
-                for name, p in pmap.items():
-                    if isinstance(p, RheaBooleanParam):
-                        lit = p.truevalue if p.value else p.falsevalue
-                    elif isinstance(p, (RheaSelectParam, RheaTextParam)):
-                        lit = p.value
-                    elif isinstance(p, RheaMultiSelectParam):
-                        vals = []
-                        for _p in p.values:
-                            vals.append(_p.value)
-                        lit = ",".join(vals) # TODO: Check if this is correct
-                    elif isinstance(p, RheaFileParam):
-                        lit = str(p.value)
-                    elif isinstance(p, RheaFloatParam):
-                        lit = str(p.value)
-                    else:
-                        raise NotImplementedError(type(p))
-                    cond = cond.replace(f"${name}", repr(lit))
-                try:
-                    keep = bool(eval(cond, {"str": str}))
-                except Exception:
-                    keep = False
-                stack.append(stack[-1] and keep)
-                continue
+        pattern = re.compile(r'\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)')
+        for var in set(pattern.findall(cmd)):
+            parts = var.split('.')
+            cur = context
+            for p in parts[:-1]:
+                cur = cur.setdefault(p, {})
+            cur.setdefault(parts[-1], None)
 
-            # end of block
-            if re.search(r"#end(?:\s*if)?\b", line, flags=re.IGNORECASE):
-                if len(stack) > 1:
-                    stack.pop()
-                continue
+        def to_ns(obj):
+            if isinstance(obj, dict):
+                return SimpleNamespace(**{k: to_ns(v) for k, v in obj.items()})
+            return obj
 
-            # normal line
-            if stack[-1]:
-                in_if = len(stack) > 1
-                processed.append((line, in_if))
+        search_ns = {k: to_ns(v) for k, v in context.items()}
 
-        # final substitution only inside if-blocks
-        var_pattern = re.compile(r"\$(\w+)")
-        result_lines: List[str] = []
-        for text, in_if in processed:
-            if in_if:
+        tmpl = Template(source=cmd, searchList=[search_ns])
+        rendered = tmpl.respond()
 
-                def repl(m: re.Match) -> str:
-                    name = m.group(1)
-                    p = pmap.get(name)
-                    if not p:
-                        return m.group(0)
-                    if isinstance(p, RheaBooleanParam):
-                        return p.truevalue if p.value else p.falsevalue
-                    if isinstance(p, (RheaSelectParam, RheaTextParam)):
-                        return str(p.value or "")
-                    if isinstance(p, RheaFileParam):
-                        return m.group(0)  # leave $var untouched
-                    return m.group(0)
-
-                text = var_pattern.sub(repl, text)
-            result_lines.append(text)
-
-        return " ".join(result_lines).strip()
+        return rendered.replace('\n', ' ')
 
     def unescape_bash_vars(self, cmd: str) -> str:
         """
@@ -576,6 +535,7 @@ class RheaToolAgent(Behavior):
             self,
             env: dict[str, str],
             params: List[RheaParam],
+            tool_params: List[Param],
             input_dir: str,
             input_store: Store
         ) -> None:
@@ -614,6 +574,13 @@ class RheaToolAgent(Behavior):
                     values.append(p.value)
                 env[param.name] = ",".join(values) # TODO: Check if this is correct
         
+        # For params that were not provided (optional ones), put their default value
+        for param in tool_params:
+            if param.optional:
+                if param.name not in env and param.name is not None:
+                    if param.value is not None:
+                        env[param.name] = param.value
+        
     def build_output_env_parameters(
             self,
             env: dict[str, str],
@@ -637,11 +604,13 @@ class RheaToolAgent(Behavior):
                 cwd = output
 
                 # Populate input environment variables
-                self.build_env_parameters(env, params, input, input_store)
+                self.build_env_parameters(env, params, self.tool.inputs.params, input, input_store)
 
+                # Configure outputs
+                self.build_output_env_parameters(env, output)
+                
                 # Configure command script
-                cmd = self.expand_galaxy_if(self.tool.command, params)
-                cmd = " ".join(cmd.split())  # Collapse to one line
+                cmd = self.expand_galaxy_if(self.tool.command, env)
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
                 cmd = self.quote_shell_params(cmd)
@@ -663,8 +632,7 @@ class RheaToolAgent(Behavior):
                             os.chmod(script_path, 0o755)
                             env[configfile.name] = script_path
 
-                # Configure outputs
-                self.build_output_env_parameters(env, output)
+                
 
                 # Run tool
                 cmd = [

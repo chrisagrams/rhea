@@ -47,8 +47,10 @@ def sample_tool(tools):
     # tool_id = "783bde422b425bd9"
     # tool_id = "a74ca2106a7a2073"
     # tool_id = "adf651eab94cc80c"
-    tool_id = "8423143bf85371a0"
-
+    # tool_id = "8423143bf85371a0"
+    # tool_id = "8e36777d470b3c19"
+    tool_id = "fa1c79f582a17d50"
+ 
     return tools.get(tool_id) or next(iter(tools.values()))
 
 
@@ -108,9 +110,9 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
         Store("rhea-test-output", connector, register=True) as output_store,
     ):
         env = os.environ.copy()
-        agent.build_env_parameters(env, params, "/tmp", input_store)
+        agent.build_env_parameters(env, params, sample_tool.inputs.params, "/tmp", input_store)
         agent.build_output_env_parameters(env, "/tmp")
-        cmd = agent.expand_galaxy_if(sample_tool.command, params)
+        cmd = agent.expand_galaxy_if(sample_tool.command, env)
         cmd = agent.unescape_bash_vars(cmd)
         cmd = agent.fix_var_quotes(cmd)
         cmd = agent.quote_shell_params(cmd)
@@ -123,8 +125,8 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
 def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
     passed = []
     failed = []
-    limit = len(tools.items())
-    # limit = 100
+    # limit = len(tools.items())
+    limit = 1000
     count = 0
     for tool_id, tool in tools.items():
         agent.tool = tool

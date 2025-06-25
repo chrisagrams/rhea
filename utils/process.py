@@ -89,7 +89,7 @@ def process_inputs(
 
                     # Insert conditional
                     cp = conditional.param.model_copy()
-                    cp.name = f"{conditional.name}_{conditional.param.name}"
+                    cp.name = f"{conditional.name}.{conditional.param.name}"
                     tool_params.append(RheaParam.from_param(cp, param.value))
                     for when in conditional.whens:
                         if when.value == param.value:
@@ -101,9 +101,9 @@ def process_inputs(
 
                                 # Insert conditional
                                 inner_param = Param(
-                                    name=f"{conditional.name}_{when_param.name}", type="text")
+                                    name=f"{conditional.name}.{when_param.name}", type="text")
                                 inner_param = when_param.model_copy()
-                                inner_param.name = f"{conditional.name}_{when_param.name}"
+                                inner_param.name = f"{conditional.name}.{when_param.name}"
                                 tool_params.append(RheaParam.from_param(inner_param, when_param.value))
     return tool_params
 

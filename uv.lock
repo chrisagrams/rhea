@@ -302,6 +302,12 @@ wheels = [
 ]
 
 [[package]]
+name = "cheetah3"
+version = "3.2.6.post1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/33/ace0250068afca106c1df34348ab0728e575dc9c61928d216de3e381c460/Cheetah3-3.2.6.post1.tar.gz", hash = "sha256:58b5d84e5fbff6cf8e117414b3ea49ef51654c02ee887d155113c5b91d761967", size = 295992, upload-time = "2021-02-22T10:33:23.191Z" }
+
+[[package]]
 name = "click"
 version = "8.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1423,6 +1429,7 @@ name = "rhea"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cheetah3" },
     { name = "minio" },
     { name = "mypy" },
     { name = "parsl" },
@@ -1436,6 +1443,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cheetah3", specifier = ">=3.2.6.post1" },
     { name = "minio", specifier = ">=7.2.15" },
     { name = "mypy", specifier = ">=1.16.1" },
     { name = "parsl", specifier = ">=2025.6.23" },
