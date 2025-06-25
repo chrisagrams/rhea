@@ -1430,6 +1430,8 @@ dependencies = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+    { name = "shellcheck-py" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -1441,6 +1443,8 @@ requires-dist = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "shellcheck-py", specifier = ">=0.10.0.1" },
+    { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
 [[package]]
@@ -1513,6 +1517,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/78/46/db58cf700f1408cf0f63d3f939f7b077bd450da8e037310f70e74c41262f/setproctitle-1.3.6-pp310-pypy310_pp73-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:797f2846b546a8741413c57d9fb930ad5aa939d925c9c0fa6186d77580035af7", size = 13520, upload-time = "2025-04-29T13:34:44.287Z" },
     { url = "https://files.pythonhosted.org/packages/5c/46/0b89e7ebe77543e721c67077ad93fc8c7c3c31a8db3b12e00d02950f6adc/setproctitle-1.3.6-pp310-pypy310_pp73-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4ac3eb04bcf0119aadc6235a2c162bae5ed5f740e3d42273a7228b915722de20", size = 13094, upload-time = "2025-04-29T13:34:45.605Z" },
     { url = "https://files.pythonhosted.org/packages/f7/78/03f2e42eb83bce6f853d7751ae95f8a3ae7408145a0b6cdd717be01497d7/setproctitle-1.3.6-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:0e6b5633c94c5111f7137f875e8f1ff48f53b991d5d5b90932f27dc8c1fa9ae4", size = 12241, upload-time = "2025-04-29T13:34:46.996Z" },
+]
+
+[[package]]
+name = "shellcheck-py"
+version = "0.10.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/ad/b96c0bc2e740797770307065464780eaeb1ab3eaa2bc4fbddaa8cfbba2ea/shellcheck_py-0.10.0.1.tar.gz", hash = "sha256:390826b340b8c19173922b0da5ef7b66ef34d4d087dc48aad3e01f7e77e164d9", size = 3071, upload-time = "2024-03-17T15:15:39.409Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/74/b72e25338a8813da9845ffe0213c597bed0317078ebb096c72d3f8347972/shellcheck_py-0.10.0.1-py2.py3-none-macosx_11_0_x86_64.whl", hash = "sha256:48f08965cafbb3363b265c4ef40628ffced19cb6fc7c4bb5ce72d32cbcfb4bb9", size = 6751219, upload-time = "2024-03-17T15:18:05.499Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/e8/95f0a2431e1c557af017648cd83ac52de81a16fa1cbe412b12e7dda51688/shellcheck_py-0.10.0.1-py2.py3-none-macosx_14_0_arm64.whl", hash = "sha256:8f3bf12ee6d0845dd5ac1a7bac8c4b1fec0379e115950986883c9488af40ada7", size = 11316565, upload-time = "2024-03-17T15:28:46.763Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/5c/ca7c7440dc25591961a8c6544468d3c987e2a84cb832a0f8b10e699e43b6/shellcheck_py-0.10.0.1-py2.py3-none-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c1c266f7f54cd286057c592ead3095f93d123acdcabf048879a7d8900c3aac7b", size = 3647494, upload-time = "2024-03-17T15:20:41.627Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/f7/5a1fff2c73bb2d044e3e9556961c4bb42525298782a199c8af232bf5ea8a/shellcheck_py-0.10.0.1-py2.py3-none-win_amd64.whl", hash = "sha256:be73a16931c05f79643ff74b6519d1e1203b394583ab8c68a48a8e7f257d1090", size = 1611786, upload-time = "2024-03-17T15:18:07.95Z" },
 ]
 
 [[package]]
@@ -1601,6 +1617,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/19/75/241269d1da26b624c0d5e110e8149093c759b7a286138f4efd61a60e75fe/tomli_w-1.2.0.tar.gz", hash = "sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021", size = 7184, upload-time = "2025-01-15T12:07:24.262Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl", hash = "sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90", size = 6675, upload-time = "2025-01-15T12:07:22.074Z" },
+]
+
+[[package]]
+name = "tqdm"
+version = "4.67.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737, upload-time = "2024-11-24T20:12:22.481Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2", size = 78540, upload-time = "2024-11-24T20:12:19.698Z" },
 ]
 
 [[package]]

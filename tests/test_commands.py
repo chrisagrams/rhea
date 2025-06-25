@@ -1,11 +1,16 @@
 import pytest
 import pickle
+import subprocess
+import json
+import os
+import shlex
 from types import SimpleNamespace
 from agent.tool import RheaToolAgent, RheaParam
 from utils.schema import Tool, Test
 from utils.process import process_inputs
 from proxystore.connectors.redis import RedisConnector
-from typing import List
+from proxystore.store import Store
+from typing import List, Dict, Any
 from minio import Minio
 
 
@@ -38,8 +43,45 @@ def minio_client():
 
 @pytest.fixture
 def sample_tool(tools):
-    tool_id = "c198b9ec43cfbe0e"
+    # tool_id = "c198b9ec43cfbe0e"
+    # tool_id = "783bde422b425bd9"
+    # tool_id = "a74ca2106a7a2073"
+    # tool_id = "adf651eab94cc80c"
+    tool_id = "8423143bf85371a0"
+
     return tools.get(tool_id) or next(iter(tools.values()))
+
+
+ignore_codes = [
+    2164, #Use 'cd ... || exit' or 'cd ... || return' in case cd fails.
+]
+
+def shellcheck_lint(script: str, env: dict[str, str]) -> List[Dict[str, Any]]:
+    header_lines = []
+    for k, v in env.items():
+        if not k or v is None:
+            continue
+        header_lines.append(f"export {k}={shlex.quote(v)}")
+
+    header = "\n".join(header_lines)
+    full_script = header + "\n" + script
+
+    cmd = ["shellcheck", "-s", "bash", "-f", "json"]
+    codes = ",".join(f"SC{c}" for c in ignore_codes)
+    cmd += ["-e", codes]
+    cmd += ["-"]
+
+    result = subprocess.run(
+        cmd,
+        input=full_script,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if not result.stdout:
+        return []
+    data = json.loads(result.stdout)
+    return data
 
 
 def test_simple_replace_galaxy_var_with_value(agent):
@@ -56,10 +98,46 @@ def test_simple_replace_galaxy_var_with_default(agent):
 
 def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
     agent.tool = sample_tool
+    agent.minio = minio_client
 
     params = process_inputs(
         agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
     )
-    cmd = agent.expand_galaxy_if(sample_tool.command, params)
+    with (
+        Store("rhea-test-input", connector, register=True) as input_store,
+        Store("rhea-test-output", connector, register=True) as output_store,
+    ):
+        env = os.environ.copy()
+        agent.build_env_parameters(env, params, "/tmp", input_store)
+        agent.build_output_env_parameters(env, "/tmp")
+        cmd = agent.expand_galaxy_if(sample_tool.command, params)
+        cmd = agent.unescape_bash_vars(cmd)
+        cmd = agent.fix_var_quotes(cmd)
+        cmd = agent.quote_shell_params(cmd)
+        cmd = agent.replace_dotted_vars(cmd)
+        issues = shellcheck_lint(cmd, env)
 
-    assert True
+        assert len(issues) == 0
+
+
+def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
+    passed = []
+    failed = []
+    limit = len(tools.items())
+    # limit = 100
+    count = 0
+    for tool_id, tool in tools.items():
+        agent.tool = tool
+        try:
+            test_expand_galaxy_if(agent, tool, connector, minio_client)
+            passed.append(tool_id)
+        except Exception:
+            failed.append(tool_id)
+        count += 1
+        if count == limit: 
+            break
+    total = len(passed) + len(failed)
+    num_passed = len(passed)
+    assert not failed, (
+        f"{num_passed}/{total} passed; failures: {failed[0:10]}..."
+    )

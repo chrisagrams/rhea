@@ -70,6 +70,10 @@ class RheaParam:
             return RheaMultiSelectParam.from_param(param, values)
         elif param.type == "select":
             if type(value) is not str:
+                if param.options is not None:
+                    for option in param.options:
+                        if option.selected:
+                            return RheaSelectParam.from_param(param, option.value)
                 raise ValueError("Value must be a 'str' for select param.")
             return RheaSelectParam.from_param(param, value)
         raise NotImplementedError(f"Param {param.type} not implemented.")
@@ -194,6 +198,8 @@ class RheaSelectParam(RheaParam):
         for option in param.options:
             if option.value == value:
                 return cls(name=param.name, type=param.type, value=option.value)
+        if param.optional:
+            return cls(name=param.name, type=param.type, value='')
         raise ValueError(f"Value {value} not in select options.")
 
 
@@ -436,7 +442,7 @@ class RheaToolAgent(Behavior):
 
     def replace_galaxy_var(self, var: str, value: Optional[int] = None) -> None:
         """
-        Replace occurrences of "\${VAR:-Z}" (with or without surrounding quotes) in `script`.
+        Replace occurrences of "\\${VAR:-Z}" (with or without surrounding quotes) in `script`.
         If `value` is given, use it; otherwise keep the default Z.
         """
         pattern = re.compile(rf'"?\\\$\{{{re.escape(var)}:-(\d+)\}}"?')
@@ -472,6 +478,8 @@ class RheaToolAgent(Behavior):
                             vals.append(_p.value)
                         lit = ",".join(vals) # TODO: Check if this is correct
                     elif isinstance(p, RheaFileParam):
+                        lit = str(p.value)
+                    elif isinstance(p, RheaFloatParam):
                         lit = str(p.value)
                     else:
                         raise NotImplementedError(type(p))
@@ -520,7 +528,7 @@ class RheaToolAgent(Behavior):
 
     def unescape_bash_vars(self, cmd: str) -> str:
         """
-        Turn every '\$foo' into '$foo' so that bash will expand it at runtime.
+        Turn every '\\$foo' into '$foo' so that bash will expand it at runtime.
         """
         # Replace any backslash immediately before a $ with nothing
         return re.sub(r"\\\$", r"$", cmd)
@@ -536,66 +544,128 @@ class RheaToolAgent(Behavior):
         pattern = re.compile(r"'(\$[^']+)'")
         return pattern.sub(r'"\1"', cmd)
 
+    def quote_shell_params(self, cmd: str) -> str:
+        # split out double- or single-quoted spans
+        parts = re.split(r'(".*?"|\'.*?\')', cmd)
+        def wrap(seg: str) -> str:
+            # leave quoted spans untouched
+            if seg and seg[0] in ('"', "'"):
+                return seg
+            # match unescaped $VAR or ${VAR}, wrap in quotes
+            return re.sub(
+                r'(?<!\\)(\$(?:\{[^}]+\}|[A-Za-z_]\w*))',
+                r'"\1"',
+                seg
+            )
+        return ''.join(wrap(p) for p in parts)
+    
+    def replace_dotted_vars(self, cmd: str) -> str:
+        """
+        Replace bash vars like $name.value or ${name.value} with $name_value or ${name_value}.
+        """
+        pattern = re.compile(r'(?<!\\)\$(\{)?([A-Za-z_]\w*)\.([A-Za-z_]\w*)(\})?')
+        def repl(m: re.Match) -> str:
+            has_brace, var, field, closing = m.group(1), m.group(2), m.group(3), m.group(4)
+            if has_brace:
+                return f'${{{var}_{field}}}'
+            return f'${var}_{field}'
+        return pattern.sub(repl, cmd)
+        
+
+    def build_env_parameters(
+            self,
+            env: dict[str, str],
+            params: List[RheaParam],
+            input_dir: str,
+            input_store: Store
+        ) -> None:
+        # Configure parameters
+        env["__tool_directory__"] = self.configure_tool_directory()
+
+        for param in params:
+            if isinstance(param, RheaFileParam):
+                tmp_file_path = os.path.join(input_dir, str(param.value.redis_key))
+                with open(tmp_file_path, "wb") as f:
+                    buffer = input_store.get(param.value)
+                    if buffer is not None:
+                        f.write(buffer)
+                    else:
+                        raise KeyError(
+                            f"No file associated with key {param.value}"
+                        )
+                env[param.name] = tmp_file_path
+            elif isinstance(param, RheaBooleanParam):
+                if param.checked or param.value:
+                    value = param.truevalue
+                else:
+                    value = param.falsevalue
+                env[param.name] = value
+            elif isinstance(param, RheaTextParam):
+                env[param.name] = param.value
+            elif isinstance(param, RheaIntegerParam):
+                env[param.name] = str(param.value)
+            elif isinstance(param, RheaFloatParam):
+                env[param.name] = str(param.value)
+            elif isinstance(param, RheaSelectParam):
+                env[param.name] = param.value
+            elif isinstance(param, RheaMultiSelectParam):
+                values = []
+                for p in param.values:
+                    values.append(p.value)
+                env[param.name] = ",".join(values) # TODO: Check if this is correct
+        
+    def build_output_env_parameters(
+            self,
+            env: dict[str, str],
+            output_dir: str,
+    ) -> None:
+        if self.tool.outputs.data is not None:
+            for out in self.tool.outputs.data:
+                if out.from_work_dir is None or out.from_work_dir == "":
+                    env[out.name] = os.path.join(output_dir, out.name)
+                else:
+                    env[out.name] = os.path.join(output_dir, out.from_work_dir)
+
     @action
     def run_tool(self, params: List[RheaParam]) -> RheaOutput:
         env = os.environ.copy()
-        env["__tool_directory__"] = self.configure_tool_directory()
         with (
             Store("rhea-input", self.connector, register=True) as input_store,
             Store("rhea-output", self.connector, register=True) as output_store,
         ):
             with TemporaryDirectory() as input, TemporaryDirectory() as output:
                 cwd = output
-                # Configure parameters
-                for param in params:
-                    if isinstance(param, RheaFileParam):
-                        tmp_file_path = os.path.join(input, str(param.value.redis_key))
-                        with open(tmp_file_path, "wb") as f:
-                            buffer = input_store.get(param.value)
-                            if buffer is not None:
-                                f.write(buffer)
-                            else:
-                                raise KeyError(
-                                    f"No file associated with key {param.value}"
-                                )
-                        env[param.name] = tmp_file_path
-                    elif isinstance(param, RheaBooleanParam):
-                        if param.checked or param.value:
-                            value = param.truevalue
-                        else:
-                            value = param.falsevalue
-                        env[param.name] = value
-                    elif isinstance(param, RheaTextParam):
-                        env[param.name] = param.value
-                    elif isinstance(param, RheaIntegerParam):
-                        env[param.name] = str(param.value)
-                    elif isinstance(param, RheaFloatParam):
-                        env[param.name] = str(param.value)
-                    elif isinstance(param, RheaSelectParam):
-                        env[param.name] = param.value
-                    elif isinstance(param, RheaMultiSelectParam):
-                        values = []
-                        for p in param.values:
-                            values.append(p.value)
-                        env[param.name] = ",".join(values) # TODO: Check if this is correct
+
+                # Populate input environment variables
+                self.build_env_parameters(env, params, input, input_store)
+
                 # Configure command script
                 cmd = self.expand_galaxy_if(self.tool.command, params)
                 cmd = " ".join(cmd.split())  # Collapse to one line
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
+                cmd = self.quote_shell_params(cmd)
+                cmd = self.replace_dotted_vars(cmd)
+
                 with NamedTemporaryFile("w", suffix=".sh", delete=False) as tf:
                     script_path = tf.name
                     tf.write("#!/usr/bin/env bash\n")
                     tf.write(cmd + "\n")
                     os.chmod(script_path, 0o755)
 
+                # Configure configfiles (if any)
+                # TODO: Expand the parameters from within the configfiles (WHY DID THEY DO THIS)
+                if self.tool.configfiles is not None and self.tool.configfiles.configfiles is not None:
+                    for configfile in self.tool.configfiles.configfiles:
+                        with NamedTemporaryFile('w', delete=False) as tf:
+                            script_path = tf.name
+                            tf.write(configfile.text)
+                            os.chmod(script_path, 0o755)
+                            env[configfile.name] = script_path
+
                 # Configure outputs
-                if self.tool.outputs.data is not None:
-                    for out in self.tool.outputs.data:
-                        if out.from_work_dir is None or out.from_work_dir == "":
-                            env[out.name] = os.path.join(output, out.name)
-                        else:
-                            env[out.name] = os.path.join(output, out.from_work_dir)
+                self.build_output_env_parameters(env, output)
+
                 # Run tool
                 cmd = [
                     "conda",

@@ -46,25 +46,65 @@ def process_inputs(
     minio_bucket: str,
 ) -> List[RheaParam]:
     tool_params: List[RheaParam] = []
-    if test.params is not None:
-        for input_param in tool.inputs.params:
-            for test_param in test.params:
-                if input_param.name == test_param.name:
-                    if input_param.type == "data":
-                        tool_params.append(
-                            get_test_file_from_store(
-                                tool.id,
-                                input_param,
-                                test_param,
-                                connector,
-                                minio_client,
-                                minio_bucket,
-                            )
+    if test.params is None:
+        return tool_params
+    
+    # Params
+    test_map = {p.name: p for p in (test.params or [])}
+    for input_param in tool.inputs.params:
+        test_param = test_map.get(input_param.name)
+        if test_param:
+            if input_param.name == test_param.name:
+                if input_param.type == "data":
+                    tool_params.append(
+                        get_test_file_from_store(
+                            tool.id,
+                            input_param,
+                            test_param,
+                            connector,
+                            minio_client,
+                            minio_bucket,
                         )
-                    else:
-                        tool_params.append(
-                            RheaParam.from_param(input_param, test_param.value)
-                        )
+                    )
+                else:
+                    tool_params.append(
+                        RheaParam.from_param(input_param, test_param.value)
+                    )
+        else: # Populate defaults
+            if input_param.type == 'boolean':
+                tool_params.append(RheaParam.from_param(input_param, input_param.checked))
+            elif input_param.type == 'select':
+                try:
+                    p = RheaParam.from_param(input_param, '')
+                    tool_params.append(p)
+                except ValueError: # None value doesn't exist, do nothing
+                    pass
+    # Conditionals
+    if tool.inputs.conditionals is not None:
+        for conditional in tool.inputs.conditionals:
+            for param in test.params:
+                if param.name == conditional.param.name:
+                    # Insert regular
+                    tool_params.append(RheaParam.from_param(conditional.param, param.value))
+
+                    # Insert conditional
+                    cp = conditional.param.model_copy()
+                    cp.name = f"{conditional.name}_{conditional.param.name}"
+                    tool_params.append(RheaParam.from_param(cp, param.value))
+                    for when in conditional.whens:
+                        if when.value == param.value:
+                            for when_param in when.params:
+                                if when_param.type == 'hidden':
+                                    when_param.type = 'text'
+                                # Insert regular
+                                tool_params.append(RheaParam.from_param(when_param, when_param.value))
+
+                                # Insert conditional
+                                inner_param = Param(
+                                    name=f"{conditional.name}_{when_param.name}", type="text")
+                                inner_param = when_param.model_copy()
+                                inner_param.name = f"{conditional.name}_{when_param.name}"
+                                tool_params.append(RheaParam.from_param(inner_param, when_param.value))
     return tool_params
 
 
