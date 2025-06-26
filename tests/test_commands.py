@@ -55,7 +55,8 @@ def sample_tool(tools):
 
     # tool_id = "82ab1904790830ef"
     # tool_id = "46188e84a762dfdb"
-    tool_id = "db44833d587592d4"
+    # tool_id = "db44833d587592d4"
+    tool_id = "693ed3fbdee03329"
  
     return tools.get(tool_id) or next(iter(tools.values()))
 
@@ -110,6 +111,7 @@ def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
 
     if len(sample_tool.tests.tests) == 0:
         assert True
+        return
 
     params = process_inputs(
         agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
