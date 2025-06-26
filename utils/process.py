@@ -22,15 +22,19 @@ def get_test_file_from_store(
     if input_param.type != "data":
         raise Exception(f"Expected a 'data' param. Got {input_param.value}")
 
-    for obj in minio_client.list_objects(bucket, prefix=f"{tool_id}/", recursive=True):
-        if obj.object_name is not None:
-            if obj.object_name.split("/")[-1] == test_param.value:
-                with Store("rhea-input", connector, register=True) as input_store:
-                    resp = minio_client.get_object(bucket, obj.object_name)
-                    content = resp.read()
-                    proxy = input_store.proxy(content)
-                    key = get_key(proxy)
-                    return RheaParam.from_param(input_param, key)
+    prefix = f"{tool_id}/test-data/"
+    for obj in minio_client.list_objects(bucket, prefix=prefix, recursive=True):
+        object_name = obj.object_name
+        if object_name is None:
+            continue
+        relative_path = object_name[len(prefix):]
+        if relative_path == test_param.value:
+            with Store("rhea-input", connector, register=True) as input_store:
+                resp = minio_client.get_object(bucket, object_name)
+                content = resp.read()
+                proxy = input_store.proxy(content)
+                key = get_key(proxy)
+                return RheaParam.from_param(input_param, key)
     raise ValueError(f"{test_param.name} not found in bucket.")
 
 
@@ -87,97 +91,122 @@ def process_inputs(
         return tool_params
     
     # Params
-    test_map = {p.name: p for p in (test.params or [])}
+    # The old way of doing repeats is with a "|" split, where LHS is the index and RHS is the actual param name
+    test_map = {
+        p.name.split("|")[-1]: p
+        for p in (test.params or [])
+        if p.name is not None
+    }    
     for input_param in tool.inputs.params:
         if input_param.name is None and input_param.argument is not None:
             input_param.name = input_param.argument.replace('--', '')
-        test_param = test_map.get(input_param.name)
-        if test_param:
-            if input_param.name == test_param.name:
-                if input_param.type == "data":
-                    tool_params.append(
-                        get_test_file_from_store(
-                            tool.id,
-                            input_param,
-                            test_param,
-                            connector,
-                            minio_client,
-                            minio_bucket,
+        if input_param.name is not None:
+            test_param = test_map.get(input_param.name)
+            if test_param:
+                if input_param.name == test_param.name:
+                    if input_param.type == "data" and test_param.value is not None:
+                        if input_param.multiple:
+                            values = test_param.value.split(',')
+                            for value in values:
+                                test_param_copy = test_param.model_copy()
+                                test_param_copy.value = value
+                                tool_params.append(
+                                    get_test_file_from_store(
+                                        tool.id,
+                                        input_param,
+                                        test_param_copy,
+                                        connector,
+                                        minio_client,
+                                        minio_bucket
+                                    )
+                                )
+                        else:
+                            tool_params.append(
+                                get_test_file_from_store(
+                                    tool.id,
+                                    input_param,
+                                    test_param,
+                                    connector,
+                                    minio_client,
+                                    minio_bucket,
+                                )
+                            )
+                    else:
+                        tool_params.append(
+                            RheaParam.from_param(input_param, test_param.value)
                         )
-                    )
-                else:
-                    tool_params.append(
-                        RheaParam.from_param(input_param, test_param.value)
-                    )
-        else: # Populate defaults
-            if input_param.type == 'boolean':
-                tool_params.append(RheaParam.from_param(input_param, input_param.checked))
-            elif input_param.type == 'select':
-                try:
-                    p = RheaParam.from_param(input_param, '')
-                    tool_params.append(p)
-                except ValueError: # None value doesn't exist, do nothing
-                    pass
-            elif input_param.type == 'integer' or input_param.type == 'text' or input_param.type == 'float':
-                if input_param.value:
-                    tool_params.append(RheaParam.from_param(input_param, input_param.value))
-                else:
+            else: # Populate defaults
+                if input_param.type == 'boolean':
+                    tool_params.append(RheaParam.from_param(input_param, input_param.checked))
+                elif input_param.type == 'select':
+                    try:
+                        p = RheaParam.from_param(input_param, '')
+                        tool_params.append(p)
+                    except ValueError: # None value doesn't exist, do nothing
+                        pass
+                elif input_param.type == 'integer' or input_param.type == 'text' or input_param.type == 'float':
+                    if input_param.value:
+                        tool_params.append(RheaParam.from_param(input_param, input_param.value))
+                    else:
+                        input_copy = input_param.model_copy()
+                        input_copy.type = 'text'
+                        tool_params.append(RheaParam.from_param(input_copy, ''))
+                elif input_param.type == 'hidden':
                     input_copy = input_param.model_copy()
                     input_copy.type = 'text'
-                    tool_params.append(RheaParam.from_param(input_copy, ''))
-            elif input_param.type == 'hidden':
-                input_copy = input_param.model_copy()
-                input_copy.type = 'text'
-                if input_copy.value:
-                    tool_params.append(RheaParam.from_param(input_copy, input_copy.value))
+                    if input_copy.value:
+                        tool_params.append(RheaParam.from_param(input_copy, input_copy.value))
+                    else:
+                        tool_params.append(RheaParam.from_param(input_copy, ''))
                 else:
-                    tool_params.append(RheaParam.from_param(input_copy, ''))
-            else:
-                if not input_param.optional:
-                    raise NotImplementedError(f"Param of type {input_param.type} not implemented.")
+                    if not input_param.optional:
+                        raise NotImplementedError(f"Param of type {input_param.type} not implemented.")
     
     # Conditionals
     if tool.inputs.conditionals is not None:
         for conditional in tool.inputs.conditionals:
-            param = test_map.get(conditional.param.name)
-            if param:
-                # Insert regular
-                tool_params.append(RheaParam.from_param(conditional.param, param.value))
+            if conditional.param.name is not None:
+                param = test_map.get(conditional.param.name)
+                if param:
+                    # Insert regular
+                    tool_params.append(RheaParam.from_param(conditional.param, param.value))
 
-                # Insert conditional
-                cp = conditional.param.model_copy()
-                cp.name = f"{conditional.name}.{conditional.param.name}"
-                tool_params.append(RheaParam.from_param(cp, param.value))
-                for when in conditional.whens:
-                    if when.value == param.value:
-                        for when_param in when.params:
-                            if when_param.type == 'hidden':
-                                when_param.type = 'text'
-
-                            second_param = test_map.get(when_param.name)
-                            if second_param:
-                                tool_params.extend(
-                                    populate_regular_and_conditional(when_param, conditional.name, second_param.value)
-                                )
-                            else:
-                                tool_params.extend(
-                                    populate_regular_and_conditional(when_param, conditional.name, when_param.value)
-                                )
-            else: # Populate defaults
-                tool_params.extend(populate_defaults(conditional.param, conditional))
+                    # Insert conditional
+                    cp = conditional.param.model_copy()
+                    cp.name = f"{conditional.name}.{conditional.param.name}"
+                    tool_params.append(RheaParam.from_param(cp, param.value))
+                    for when in conditional.whens:
+                        if when.value == param.value:
+                            for when_param in when.params:
+                                if when_param.type == 'hidden':
+                                    when_param.type = 'text'
+                                
+                                if when_param.name is not None:
+                                    second_param = test_map.get(when_param.name)
+                                    if second_param:
+                                        tool_params.extend(
+                                            populate_regular_and_conditional(when_param, conditional.name, second_param.value)
+                                        )
+                                    else:
+                                        tool_params.extend(
+                                            populate_regular_and_conditional(when_param, conditional.name, when_param.value)
+                                        )
+                else: # Populate defaults
+                    tool_params.extend(populate_defaults(conditional.param, conditional))
                            
     
     # Section
     if tool.inputs.sections is not None:
         for section in tool.inputs.sections:
             for section_param in section.params:
-                test_param = test_map.get(section_param.name)
-                if test_param:
-                    tool_params.extend(
-                        populate_regular_and_conditional(section_param, section.name, test_param.value)
-                    )
-                else: # Populate defaults
-                    tool_params.extend(populate_defaults(section_param, section))
+                if section_param.name is not None:
+                    test_param = test_map.get(section_param.name)
+                    if test_param:
+                        tool_params.extend(
+                            populate_regular_and_conditional(section_param, section.name, test_param.value)
+                        )
+                    else: # Populate defaults
+                        tool_params.extend(populate_defaults(section_param, section))
 
     return tool_params
 

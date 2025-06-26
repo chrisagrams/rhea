@@ -148,6 +148,10 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
         env = os.environ.copy()
         agent.build_env_parameters(env, params, sample_tool.inputs.params, "/tmp", input_store)
         agent.build_output_env_parameters(env, "/tmp")
+        if sample_tool.configfiles is not None:
+            if sample_tool.configfiles.configfiles is not None:
+                for configfile in sample_tool.configfiles.configfiles:
+                    agent.build_configfile(env, configfile)
         cmd = agent.expand_galaxy_if(sample_tool.command, env)
         cmd = cmd.replace('\n', ' ')
         cmd = agent.unescape_bash_vars(cmd)
