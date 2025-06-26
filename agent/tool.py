@@ -1,6 +1,6 @@
 from lib.academy.academy.behavior import Behavior, action, loop
 from typing import List, Optional, Any
-from utils.schema import Tool, Param, CollectionOutput
+from utils.schema import Tool, Param, CollectionOutput, ConfigFile
 import os
 import glob
 import subprocess
@@ -201,8 +201,10 @@ class RheaSelectParam(RheaParam):
         for option in param.options:
             if option.value == value:
                 return cls(name=param.name, type=param.type, value=option.value)
+            if option.selected:
+                return cls(name=param.name, type=param.type, value=option.value)
         if param.optional:
-            return cls(name=param.name, type=param.type, value='')
+            return cls(name=param.name, type=param.type, value='')            
         raise ValueError(f"Value {value} not in select options.")
 
 
@@ -465,25 +467,32 @@ class RheaToolAgent(Behavior):
                 cur = cur.setdefault(p, {})
             cur[parts[-1]] = value
 
-        pattern = re.compile(r'\$([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)')
-        for var in set(pattern.findall(cmd)):
+        var_pattern = re.compile(r'\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?')
+        vars_ = sorted(set(var_pattern.findall(cmd)),
+                    key=lambda v: v.count('.'),
+                    reverse=True)
+
+        nested_roots = {v.split('.')[0] for v in vars_ if '.' in v}
+
+        for var in vars_:
             parts = var.split('.')
-            cur = context
-            for p in parts[:-1]:
-                cur = cur.setdefault(p, {})
-            cur.setdefault(parts[-1], None)
-
-        def to_ns(obj):
-            if isinstance(obj, dict):
-                return SimpleNamespace(**{k: to_ns(v) for k, v in obj.items()})
-            return obj
-
-        search_ns = {k: to_ns(v) for k, v in context.items()}
-
-        tmpl = Template(source=cmd, searchList=[search_ns])
-        rendered = tmpl.respond()
-
-        return rendered.replace('\n', ' ')
+            if len(parts) == 1:
+                root = parts[0]
+                if root not in nested_roots and root not in context:
+                    context[root] = ''
+            else:
+                cur = context
+                for p in parts[:-1]:
+                    if p not in cur or not isinstance(cur[p], dict):
+                        cur[p] = {}
+                    cur = cur[p]
+                cur.setdefault(parts[-1], '')
+        # Remove any .get() calls
+        cmd = re.sub(r'\.get\([^)]*\)', '', cmd)
+        # Remove any .strip() calls
+        cmd = re.sub(r'\.strip\([^)]*\)', '', cmd)
+        tmpl = Template(source=cmd, searchList=[context])
+        return tmpl.respond()
 
     def unescape_bash_vars(self, cmd: str) -> str:
         """
@@ -593,6 +602,15 @@ class RheaToolAgent(Behavior):
                 else:
                     env[out.name] = os.path.join(output_dir, out.from_work_dir)
 
+    def build_configfile(self, env: dict[str, str], configfile: ConfigFile) -> str:
+        with NamedTemporaryFile('w', delete=False) as tf:
+            script_path = tf.name
+            text = self.expand_galaxy_if(configfile.text, env)
+            tf.write(text)
+            os.chmod(script_path, 0o755)
+            env[configfile.name] = script_path
+            return script_path
+
     @action
     def run_tool(self, params: List[RheaParam]) -> RheaOutput:
         env = os.environ.copy()
@@ -611,6 +629,7 @@ class RheaToolAgent(Behavior):
                 
                 # Configure command script
                 cmd = self.expand_galaxy_if(self.tool.command, env)
+                cmd = cmd.replace('\n', ' ')
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
                 cmd = self.quote_shell_params(cmd)
@@ -623,17 +642,10 @@ class RheaToolAgent(Behavior):
                     os.chmod(script_path, 0o755)
 
                 # Configure configfiles (if any)
-                # TODO: Expand the parameters from within the configfiles (WHY DID THEY DO THIS)
                 if self.tool.configfiles is not None and self.tool.configfiles.configfiles is not None:
                     for configfile in self.tool.configfiles.configfiles:
-                        with NamedTemporaryFile('w', delete=False) as tf:
-                            script_path = tf.name
-                            tf.write(configfile.text)
-                            os.chmod(script_path, 0o755)
-                            env[configfile.name] = script_path
-
-                
-
+                        self.build_configfile(env, configfile)
+                        
                 # Run tool
                 cmd = [
                     "conda",

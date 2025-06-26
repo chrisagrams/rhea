@@ -49,7 +49,13 @@ def sample_tool(tools):
     # tool_id = "adf651eab94cc80c"
     # tool_id = "8423143bf85371a0"
     # tool_id = "8e36777d470b3c19"
-    tool_id = "fa1c79f582a17d50"
+    # tool_id = "fa1c79f582a17d50"
+    # tool_id = "790743498728befc"
+    # tool_id = "9c80f36219a53991"
+
+    # tool_id = "82ab1904790830ef"
+    # tool_id = "46188e84a762dfdb"
+    tool_id = "db44833d587592d4"
  
     return tools.get(tool_id) or next(iter(tools.values()))
 
@@ -98,9 +104,12 @@ def test_simple_replace_galaxy_var_with_default(agent):
     assert agent.tool.command == "echo 5"
 
 
-def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
+def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
     agent.tool = sample_tool
     agent.minio = minio_client
+
+    if len(sample_tool.tests.tests) == 0:
+        assert True
 
     params = process_inputs(
         agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
@@ -112,7 +121,35 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
         env = os.environ.copy()
         agent.build_env_parameters(env, params, sample_tool.inputs.params, "/tmp", input_store)
         agent.build_output_env_parameters(env, "/tmp")
+        if sample_tool.configfiles is not None:
+            if sample_tool.configfiles.configfiles is not None:
+                for configfile in sample_tool.configfiles.configfiles:
+                    configfile_path = agent.build_configfile(env, configfile)
+                    assert isinstance(configfile_path, str)
+        else:
+            assert True
+
+
+def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
+    agent.tool = sample_tool
+    agent.minio = minio_client
+
+    if len(sample_tool.tests.tests) == 0:
+        assert True
+        return
+    
+    params = process_inputs(
+        agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
+    )
+    with (
+        Store("rhea-test-input", connector, register=True) as input_store,
+        Store("rhea-test-output", connector, register=True) as output_store,
+    ):
+        env = os.environ.copy()
+        agent.build_env_parameters(env, params, sample_tool.inputs.params, "/tmp", input_store)
+        agent.build_output_env_parameters(env, "/tmp")
         cmd = agent.expand_galaxy_if(sample_tool.command, env)
+        cmd = cmd.replace('\n', ' ')
         cmd = agent.unescape_bash_vars(cmd)
         cmd = agent.fix_var_quotes(cmd)
         cmd = agent.quote_shell_params(cmd)
@@ -125,8 +162,8 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
 def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
     passed = []
     failed = []
-    # limit = len(tools.items())
-    limit = 1000
+    limit = len(tools.items())
+    # limit = 1000
     count = 0
     for tool_id, tool in tools.items():
         agent.tool = tool

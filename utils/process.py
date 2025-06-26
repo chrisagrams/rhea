@@ -1,5 +1,5 @@
-from typing import List
-from utils.schema import Tool, Test, Param, Conditional
+from typing import List, Any
+from utils.schema import Tool, Test, Param, Conditional, Section
 from agent.tool import RheaParam, RheaOutput, RheaDataOutput
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
@@ -38,6 +38,43 @@ def process_conditional_inputs(conditional: Conditional):
     return
 
 
+def populate_regular_and_conditional(param: Param, parent: str, value: Any) -> List[RheaParam]:
+    result = []
+    result.append(RheaParam.from_param(param, value))
+    cp = param.model_copy()
+    cp.name = f"{parent}.{param.name}"
+    result.append(RheaParam.from_param(cp, value))
+
+    return result
+
+
+def populate_defaults(param: Param, collection: Conditional | Section) -> List[RheaParam]:
+    result = []
+    if param.type == 'boolean':
+        result.extend(
+            populate_regular_and_conditional(param, collection.name, param.checked)
+        )
+    elif param.type == 'select':
+        try:
+            result.extend(
+                populate_regular_and_conditional(param, collection.name, '')
+            )
+        except ValueError: # None value doesn't exist, do nothing
+            pass
+    elif param.type == 'integer':
+        result.extend(
+            populate_regular_and_conditional(param, collection.name, param.value)
+        )
+    elif param.type == 'text':
+        result.extend(
+            populate_regular_and_conditional(param, collection.name, param.value)
+        )
+    else:
+        raise NotImplementedError(f"Param of type {param.type} not implemented.")
+
+    return result
+
+
 def process_inputs(
     tool: Tool,
     test: Test,
@@ -52,6 +89,8 @@ def process_inputs(
     # Params
     test_map = {p.name: p for p in (test.params or [])}
     for input_param in tool.inputs.params:
+        if input_param.name is None and input_param.argument is not None:
+            input_param.name = input_param.argument.replace('--', '')
         test_param = test_map.get(input_param.name)
         if test_param:
             if input_param.name == test_param.name:
@@ -79,33 +118,71 @@ def process_inputs(
                     tool_params.append(p)
                 except ValueError: # None value doesn't exist, do nothing
                     pass
+            elif input_param.type == 'integer' or input_param.type == 'text' or input_param.type == 'float':
+                if input_param.value:
+                    tool_params.append(RheaParam.from_param(input_param, input_param.value))
+                else:
+                    input_copy = input_param.model_copy()
+                    input_copy.type = 'text'
+                    tool_params.append(RheaParam.from_param(input_copy, ''))
+            elif input_param.type == 'hidden':
+                input_copy = input_param.model_copy()
+                input_copy.type = 'text'
+                if input_copy.value:
+                    tool_params.append(RheaParam.from_param(input_copy, input_copy.value))
+                else:
+                    tool_params.append(RheaParam.from_param(input_copy, ''))
+            else:
+                if not input_param.optional:
+                    raise NotImplementedError(f"Param of type {input_param.type} not implemented.")
+    
     # Conditionals
     if tool.inputs.conditionals is not None:
         for conditional in tool.inputs.conditionals:
-            for param in test.params:
-                if param.name == conditional.param.name:
-                    # Insert regular
-                    tool_params.append(RheaParam.from_param(conditional.param, param.value))
+            param = test_map.get(conditional.param.name)
+            if param:
+                # Insert regular
+                tool_params.append(RheaParam.from_param(conditional.param, param.value))
 
-                    # Insert conditional
-                    cp = conditional.param.model_copy()
-                    cp.name = f"{conditional.name}.{conditional.param.name}"
-                    tool_params.append(RheaParam.from_param(cp, param.value))
-                    for when in conditional.whens:
-                        if when.value == param.value:
-                            for when_param in when.params:
-                                if when_param.type == 'hidden':
-                                    when_param.type = 'text'
-                                # Insert regular
-                                tool_params.append(RheaParam.from_param(when_param, when_param.value))
+                # Insert conditional
+                cp = conditional.param.model_copy()
+                cp.name = f"{conditional.name}.{conditional.param.name}"
+                tool_params.append(RheaParam.from_param(cp, param.value))
+                for when in conditional.whens:
+                    if when.value == param.value:
+                        for when_param in when.params:
+                            if when_param.type == 'hidden':
+                                when_param.type = 'text'
 
-                                # Insert conditional
-                                inner_param = Param(
-                                    name=f"{conditional.name}.{when_param.name}", type="text")
-                                inner_param = when_param.model_copy()
-                                inner_param.name = f"{conditional.name}.{when_param.name}"
-                                tool_params.append(RheaParam.from_param(inner_param, when_param.value))
+                            second_param = test_map.get(when_param.name)
+                            if second_param:
+                                tool_params.extend(
+                                    populate_regular_and_conditional(when_param, conditional.name, second_param.value)
+                                )
+                            else:
+                                tool_params.extend(
+                                    populate_regular_and_conditional(when_param, conditional.name, when_param.value)
+                                )
+            else: # Populate defaults
+                tool_params.extend(populate_defaults(conditional.param, conditional))
+                           
+    
+    # Section
+    if tool.inputs.sections is not None:
+        for section in tool.inputs.sections:
+            for section_param in section.params:
+                test_param = test_map.get(section_param.name)
+                if test_param:
+                    tool_params.extend(
+                        populate_regular_and_conditional(section_param, section.name, test_param.value)
+                    )
+                else: # Populate defaults
+                    tool_params.extend(populate_defaults(section_param, section))
+
     return tool_params
+
+
+    
 
 
 def assert_tool_tests(
