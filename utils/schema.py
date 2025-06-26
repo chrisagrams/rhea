@@ -269,9 +269,18 @@ class Conditional(BaseModel):
     whens: List[When]
 
 
+class Section(BaseModel):
+    name: str
+    title: str
+    expanded: Optional[bool] = None
+    help: Optional[str] = None
+    params: List[Param]
+
+
 class Inputs(BaseModel):
     params: List[Param]
     conditionals: Optional[List[Conditional]] = None
+    sections: Optional[List[Section]] = None
 
 
 class AssertContents(BaseModel):
@@ -689,9 +698,11 @@ class Tool(BaseModel):
         if inputs_el is not None:
             params = [parse_param(p) for p in inputs_el.findall("param")]
             conditional_els = inputs_el.findall("conditional")
+            sections_els = inputs_el.findall("section")
         else:
             params = []
             conditional_els = []
+            sections_els = []
 
         conditionals = []
         for cel in conditional_els:
@@ -709,7 +720,27 @@ class Tool(BaseModel):
                 Conditional(name=cel.get("name") or "", param=control, whens=whens)
             )
 
-        inputs = Inputs(params=params, conditionals=conditionals or None)
+        sections = []
+        for sec_el in sections_els:
+            param_elems = sec_el.findall("param")
+            section_params = []
+            for p in param_elems:
+                section_params.append(parse_param(p))
+            sec = Section(
+                name=sec_el.get("name") or "",
+                title=sec_el.get("title") or "",
+                expanded=(sec_el.get("expanded") == "True" or sec_el.get("expanded") == "true"),
+                help=sec_el.get("help"),
+                params=section_params
+            )
+            sections.append(sec)
+
+
+        inputs = Inputs(
+            params=params,
+            conditionals=conditionals or None,
+            sections=sections
+        )
 
         # Outputs
         outputs_el = root.find("outputs")
