@@ -6,8 +6,13 @@ ENV MINICONDA_HOME=/home/rhea/conda \
     PATH=/home/rhea/conda/bin:$PATH
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends wget ca-certificates bzip2 gettext-base\
+  && apt-get install -y --no-install-recommends wget ca-certificates bzip2 gettext-base locales\
   && rm -rf /var/lib/apt/lists/*
+
+# Generate locales
+RUN sed -i '/en_US.UTF-8/s/^# *//' /etc/locale.gen \
+  && locale-gen \
+  && dpkg-reconfigure --frontend=noninteractive locales
 
 RUN useradd -m -s /bin/bash rhea
 
