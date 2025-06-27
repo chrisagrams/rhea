@@ -27,20 +27,22 @@ def get_test_file_from_store(
     if input_param.type != "data":
         raise Exception(f"Expected a 'data' param. Got {input_param.type}")
 
-    prefix = f"{fc.tool_id}/test-data/"
+    prefix = f"{fc.tool_id}/"
     for obj in fc.minio_client.list_objects(fc.bucket, prefix=prefix, recursive=True):
         object_name = obj.object_name
-        if object_name is None:
+        if object_name is None or test_param.value is None:
+            continue
+        if object_name.split("/")[1] == '.hg':
             continue
         relative_path = object_name[len(prefix):]
-        if relative_path == test_param.value:
+        if test_param.value in relative_path:
             with Store("rhea-input", fc.connector, register=True) as input_store:
                 resp = fc.minio_client.get_object(fc.bucket, object_name)
                 content = resp.read()
                 proxy = input_store.proxy(content)
                 key = get_key(proxy)
                 return RheaParam.from_param(input_param, key)
-    raise ValueError(f"{test_param.name} not found in bucket.")
+    raise ValueError(f"{test_param.value} not found in bucket.")
 
 
 def process_conditional_inputs(conditional: Conditional):
