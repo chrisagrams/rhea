@@ -407,6 +407,44 @@ class AssertContents(BaseModel):
         subject = input.decode(encoding="utf-8")
         if text not in subject:
             raise AssertionError(f"Expected to find '{text}' in subject")
+        
+    def _assert_has_text_matching(
+        self,
+        input: bytes,
+        expression: str,
+        n: int = 1,
+        delta: int = 0,
+        min: int | None = None,
+        max: int | None = None,
+        negate: bool = False,
+        **kwargs,
+    ):
+        subject = input.decode("utf-8")
+        pattern = re.compile(expression)
+
+        count = sum(1 for _ in pattern.finditer(subject))
+
+        expected = int(n) if n is not None and n != "" else 1
+
+        d = int(delta) if delta not in (None, "") else 0
+        lower = expected - d
+        upper = expected + d
+
+        if min not in (None, ""):
+            lower = int(min)
+        if max not in (None, ""):
+            upper = int(max)
+
+        if negate:
+            if lower <= count <= upper:
+                raise AssertionError(
+                    f"Expected number of matching occurrences NOT in [{lower}, {upper}], but got {count}"
+                )
+        else:
+            if count < lower or count > upper:
+                raise AssertionError(
+                    f"Expected number of matching occurrences in [{lower}, {upper}], but got {count}"
+                )
 
     def _assert_has_n_lines(
         self,
@@ -420,7 +458,9 @@ class AssertContents(BaseModel):
     ):
         subject = input.decode("utf-8")
         count = subject.count("\n") + 1
-        expected = int(n)
+
+        expected = int(n) if n is not None and n != "" else 1
+
         d = int(delta) if delta is not None and delta != "" else 0
         lower = expected - d
         upper = expected + d
@@ -455,7 +495,8 @@ class AssertContents(BaseModel):
 
         count = sum(1 for line in lines if pattern.search(line))
 
-        expected = int(n)
+        expected = int(n) if n is not None and n != "" else 1
+        
         d = int(delta) if delta not in (None, "") else 0
         lower = expected - d
         upper = expected + d
