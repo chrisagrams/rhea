@@ -199,14 +199,17 @@ def process_inputs(
     if tool.inputs.sections is not None:
         for section in tool.inputs.sections:
             for section_param in section.params:
-                if section_param.name is not None:
-                    test_param = test_map.get(section_param.name)
-                    if test_param:
-                        tool_params.extend(
-                            populate_regular_and_conditional(section_param, section.name, test_param.value)
-                        )
-                    else: # Populate defaults
-                        tool_params.extend(populate_defaults(section_param, section))
+                if section_param.name is not None or section_param.argument is not None:
+                    if section_param.name is None and section_param.argument is not None:
+                        section_param.name = section_param.argument.replace('--', '')
+                    if section_param.name is not None:
+                        test_param = test_map.get(section_param.name)
+                        if test_param:
+                            tool_params.extend(
+                                populate_regular_and_conditional(section_param, section.name, test_param.value)
+                            )
+                        else: # Populate defaults
+                            tool_params.extend(populate_defaults(section_param, section))
 
     return tool_params
 
