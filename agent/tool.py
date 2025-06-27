@@ -567,7 +567,16 @@ class RheaToolAgent(Behavior):
                         raise KeyError(
                             f"No file associated with key {param.value}"
                         )
-                env[param.name] = tmp_file_path
+                if param.name in env: # If the param is already populated, its most likely a list of files
+                    #TODO: Fix type errors (this should be safe)
+                    prev = env[param.name]
+                    if isinstance(env[param.name], List):
+                        env[param.name].append(tmp_file_path)
+                    else:
+                        env[param.name] = []
+                        env[param.name].append(prev)
+                else:
+                    env[param.name] = tmp_file_path
             elif isinstance(param, RheaBooleanParam):
                 if param.checked or param.value:
                     value = param.truevalue
