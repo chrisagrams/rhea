@@ -201,6 +201,7 @@ class RheaSelectParam(RheaParam):
         for option in param.options:
             if option.value == value:
                 return cls(name=param.name, type=param.type, value=option.value)
+        for option in param.options:
             if option.selected:
                 return cls(name=param.name, type=param.type, value=option.value)
         if param.optional:
@@ -581,7 +582,7 @@ class RheaToolAgent(Behavior):
                 values = []
                 for p in param.values:
                     values.append(p.value)
-                env[param.name] = ",".join(values) # TODO: Check if this is correct
+                env[param.name] = values # TODO: Fix type errors here (it must be a List!)
         
         # For params that were not provided (optional ones), put their default value
         for param in tool_params:
@@ -646,6 +647,10 @@ class RheaToolAgent(Behavior):
                     tf.write(cmd + "\n")
                     os.chmod(script_path, 0o755)
 
+                # Remove any lists from environment
+                for k, v in env.items():
+                    if isinstance(v, list):
+                        env[k] = str(v)
                 
                 # Run tool
                 cmd = [

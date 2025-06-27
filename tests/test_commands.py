@@ -55,8 +55,9 @@ def sample_tool(tools):
 
     # tool_id = "82ab1904790830ef"
     # tool_id = "46188e84a762dfdb"
-    # tool_id = "db44833d587592d4"
-    tool_id = "693ed3fbdee03329"
+    tool_id = "db44833d587592d4"
+    # tool_id = "693ed3fbdee03329"
+    # tool_id = "c8658b82d8429f5d"
  
     return tools.get(tool_id) or next(iter(tools.values()))
 
@@ -70,6 +71,8 @@ def shellcheck_lint(script: str, env: dict[str, str]) -> List[Dict[str, Any]]:
     for k, v in env.items():
         if not k or v is None:
             continue
+        if not isinstance(v, str):
+            v = str(v)
         header_lines.append(f"export {k}={shlex.quote(v)}")
 
     header = "\n".join(header_lines)

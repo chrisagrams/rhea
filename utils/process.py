@@ -96,7 +96,7 @@ def process_inputs(
         p.name.split("|")[-1]: p
         for p in (test.params or [])
         if p.name is not None
-    }    
+    }
     for input_param in tool.inputs.params:
         if input_param.name is None and input_param.argument is not None:
             input_param.name = input_param.argument.replace('--', '')
@@ -165,6 +165,9 @@ def process_inputs(
     # Conditionals
     if tool.inputs.conditionals is not None:
         for conditional in tool.inputs.conditionals:
+            if conditional.param.name is not None or conditional.param.argument is not None:
+                if conditional.param.name is None and conditional.param.argument is not None:
+                    conditional.param.name = conditional.param.argument.replace('--', '')
             if conditional.param.name is not None:
                 param = test_map.get(conditional.param.name)
                 if param:
