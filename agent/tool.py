@@ -34,6 +34,8 @@ class RheaParam:
                 raise ValueError("Value must be a 'RedisKey' for data param.")
             return RheaFileParam.from_param(param, value)
         elif param.type == "text":  # RheaTextParam
+            if param.optional and value is None:
+                return RheaTextParam.from_param(param, '')
             if type(value) is not str:
                 raise ValueError("Value must be a 'str' for text param.")
             return RheaTextParam.from_param(param, value)
@@ -150,6 +152,8 @@ class RheaTextParam(RheaParam):
     def from_param(cls, param: Param, value: str) -> "RheaTextParam":
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
+        if param.value is None and param.optional:
+            return cls(name=param.name, type=param.type, value='') 
         return cls(name=param.name, type=param.type, value=value)
 
 

@@ -7,30 +7,35 @@ from minio import Minio
 from proxystore.store.utils import get_key
 
 
+class FileConnector():
+    def __init__(self, tool_id: str, connector: RedisConnector, minio_client: Minio, bucket: str):
+        self.tool_id = tool_id
+        self.connector = connector
+        self.minio_client = minio_client
+        self.bucket = bucket
+
+
 def get_test_file_from_store(
-    tool_id: str,
     input_param: Param,
     test_param: Param,
-    connector: RedisConnector,
-    minio_client: Minio,
-    bucket: str,
+    fc: FileConnector
 ) -> RheaParam:
     if input_param.name != test_param.name:
         raise Exception(
             f"Parameters do not match {input_param.name}!={test_param.name}"
         )
     if input_param.type != "data":
-        raise Exception(f"Expected a 'data' param. Got {input_param.value}")
+        raise Exception(f"Expected a 'data' param. Got {input_param.type}")
 
-    prefix = f"{tool_id}/test-data/"
-    for obj in minio_client.list_objects(bucket, prefix=prefix, recursive=True):
+    prefix = f"{fc.tool_id}/test-data/"
+    for obj in fc.minio_client.list_objects(fc.bucket, prefix=prefix, recursive=True):
         object_name = obj.object_name
         if object_name is None:
             continue
         relative_path = object_name[len(prefix):]
         if relative_path == test_param.value:
-            with Store("rhea-input", connector, register=True) as input_store:
-                resp = minio_client.get_object(bucket, object_name)
+            with Store("rhea-input", fc.connector, register=True) as input_store:
+                resp = fc.minio_client.get_object(fc.bucket, object_name)
                 content = resp.read()
                 proxy = input_store.proxy(content)
                 key = get_key(proxy)
@@ -42,12 +47,30 @@ def process_conditional_inputs(conditional: Conditional):
     return
 
 
-def populate_regular_and_conditional(param: Param, parent: str, value: Any) -> List[RheaParam]:
+def populate_regular_and_conditional(
+        test_param: Param,
+        parent: str,
+        value: Any,
+        input_param: Param | None = None,
+        fc: FileConnector | None = None
+) -> List[RheaParam]:
+    
     result = []
-    result.append(RheaParam.from_param(param, value))
-    cp = param.model_copy()
-    cp.name = f"{parent}.{param.name}"
-    result.append(RheaParam.from_param(cp, value))
+
+    if input_param is not None and input_param.type == "data":
+        if input_param is None or fc is None:
+            raise ValueError(f"Trying to insert data object without connector")
+        result.append(get_test_file_from_store(input_param, test_param, fc))
+        cp = test_param.model_copy()
+        cp.name = f"{parent}.{test_param.name}"
+        ip_cp = input_param.model_copy()
+        ip_cp.name= cp.name
+        result.append(get_test_file_from_store(ip_cp, cp, fc))
+    else:
+        result.append(RheaParam.from_param(test_param, value))
+        cp = test_param.model_copy()
+        cp.name = f"{parent}.{test_param.name}"
+        result.append(RheaParam.from_param(cp, value))
 
     return result
 
@@ -73,6 +96,10 @@ def populate_defaults(param: Param, collection: Conditional | Section) -> List[R
         result.extend(
             populate_regular_and_conditional(param, collection.name, param.value)
         )
+    elif param.type == 'float':
+        result.extend(
+            populate_regular_and_conditional(param, collection.name, param.value)
+        )
     else:
         raise NotImplementedError(f"Param of type {param.type} not implemented.")
 
@@ -89,6 +116,14 @@ def process_inputs(
     tool_params: List[RheaParam] = []
     if test.params is None:
         return tool_params
+    
+    # Initialize FileConnector
+    fc = FileConnector(
+        tool.id,
+        connector,
+        minio_client,
+        minio_bucket
+    )
     
     # Params
     # The old way of doing repeats is with a "|" split, where LHS is the index and RHS is the actual param name
@@ -112,23 +147,17 @@ def process_inputs(
                                 test_param_copy.value = value
                                 tool_params.append(
                                     get_test_file_from_store(
-                                        tool.id,
                                         input_param,
                                         test_param_copy,
-                                        connector,
-                                        minio_client,
-                                        minio_bucket
+                                        fc
                                     )
                                 )
                         else:
                             tool_params.append(
                                 get_test_file_from_store(
-                                    tool.id,
                                     input_param,
                                     test_param,
-                                    connector,
-                                    minio_client,
-                                    minio_bucket,
+                                    fc
                                 )
                             )
                     else:
@@ -188,11 +217,21 @@ def process_inputs(
                                     second_param = test_map.get(when_param.name)
                                     if second_param:
                                         tool_params.extend(
-                                            populate_regular_and_conditional(when_param, conditional.name, second_param.value)
+                                            populate_regular_and_conditional(
+                                                second_param,
+                                                conditional.name,
+                                                second_param.value,
+                                                input_param=when_param,
+                                                fc=fc
+                                            )
                                         )
                                     else:
                                         tool_params.extend(
-                                            populate_regular_and_conditional(when_param, conditional.name, when_param.value)
+                                            populate_regular_and_conditional(
+                                                when_param,
+                                                conditional.name,
+                                                when_param.value
+                                            )
                                         )
                 else: # Populate defaults
                     tool_params.extend(populate_defaults(conditional.param, conditional))
@@ -209,7 +248,13 @@ def process_inputs(
                         test_param = test_map.get(section_param.name)
                         if test_param:
                             tool_params.extend(
-                                populate_regular_and_conditional(section_param, section.name, test_param.value)
+                                populate_regular_and_conditional(
+                                    section_param,
+                                    section.name,
+                                    test_param.value,
+                                    input_param=section_param,
+                                    fc=fc
+                                )
                             )
                         else: # Populate defaults
                             tool_params.extend(populate_defaults(section_param, section))
