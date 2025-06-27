@@ -626,6 +626,11 @@ class RheaToolAgent(Behavior):
 
                 # Configure outputs
                 self.build_output_env_parameters(env, output)
+
+                # Configure configfiles (if any)
+                if self.tool.configfiles is not None and self.tool.configfiles.configfiles is not None:
+                    for configfile in self.tool.configfiles.configfiles:
+                        self.build_configfile(env, configfile)
                 
                 # Configure command script
                 cmd = self.expand_galaxy_if(self.tool.command, env)
@@ -641,11 +646,7 @@ class RheaToolAgent(Behavior):
                     tf.write(cmd + "\n")
                     os.chmod(script_path, 0o755)
 
-                # Configure configfiles (if any)
-                if self.tool.configfiles is not None and self.tool.configfiles.configfiles is not None:
-                    for configfile in self.tool.configfiles.configfiles:
-                        self.build_configfile(env, configfile)
-                        
+                
                 # Run tool
                 cmd = [
                     "conda",
