@@ -4,9 +4,10 @@ from chromadb.utils import embedding_functions
 from sqlalchemy.orm import sessionmaker
 from utils.models import Tool as GalaxyTool 
 from utils.models import Base
-from utils.schema import Tool, Param
+from utils.schema import Tool, Param, Inputs
 from sqlalchemy import create_engine
 from inspect import Signature, Parameter
+from typing import List, Optional
 import pickle
 
 
@@ -15,8 +16,10 @@ DB_PATH = "/Users/chrisgrams/Notes/Argonne/Galaxy-Tools-DB/db/Galaxy_Tools_filte
 engine = create_engine(f"sqlite:///{DB_PATH}")
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-with open("tools_dict.pkl", "rb") as f:
-    tools = pickle.load(f)
+galaxy_tools: dict[str, Tool] = {}
+
+with open("../tools_dict.pkl", "rb") as f:
+    galaxy_tools = pickle.load(f)
 
 mcp = FastMCP("Rhea")
 
@@ -35,6 +38,50 @@ collection = chroma_client.get_or_create_collection(
 
 def dummy_function(input: str) -> str:
     return "echo"
+
+
+def construct_params(inputs: Inputs) -> List[Parameter]:
+    res = []
+    for param in inputs.params:
+        if (param.name is None or param.name == "") and param.argument is not None:
+            param.name = param.argument.replace("--", "")
+        
+        if param.name is None:
+            continue
+        
+        if param.type == "text":
+            res.append(
+                Parameter(
+                    param.name,
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Optional[str] if param.optional else str
+                )
+            )
+        elif param.type == "select":
+            res.append(
+                Parameter(
+                    param.name,
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Optional[str] if param.optional else str
+                )
+            )
+        elif param.type == "boolean":
+            res.append(
+                Parameter(
+                    param.name,
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Optional[bool] if param.optional else bool
+                )
+            )
+        elif param.type == "data":
+            res.append(
+                Parameter(
+                    param.name,
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Optional[str] if param.optional else str
+                )
+            )
+    return res
 
 
 @mcp.tool()
@@ -63,15 +110,37 @@ def find_tools(query: str) -> str:
     )
 
     # Populate tools
-    for tool in tools:
-        def dummy_function(*args, tool_id=tool.id, **kwargs):
-            return f"Called tool {tool_id} with {args} {kwargs}"
+    for t in tools:
+        try:
+            tool = galaxy_tools[str(t.id)]
+        except KeyError as e:
+            continue
 
-        mcp.add_tool(
-            dummy_function,
-            name=tool.name,
-            description=tool.description,
+        params = construct_params(tool.inputs)
+        sig = Signature(
+            parameters=params,
+            return_annotation=List[str]
         )
+
+        def make_wrapper(tool_id, param_names):
+            def wrapper(*args, **kwargs):
+                for name, value in zip(param_names, args):
+                    kwargs.setdefault(name, value)
+                # TODO: Call agent here
+                return ["Hello world!"]
+            return wrapper
+
+        fn = make_wrapper(tool.id, [name for name in params])
+        fn.__name__ = tool.name
+        fn.__doc__ = tool.description
+        fn.__signature__ = sig # type: ignore[attr-defined]
+
+        fn.__annotations__ = {
+            p.name: p.annotation
+            for p in params
+        }        
+        fn.__annotations__['return'] = List[str]
+        mcp.add_tool(fn, name=str(t.name), description=str(t.description))
 
     session.close()
     return f"Populated {len(retrieved)} tools."

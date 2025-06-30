@@ -22,3 +22,8 @@ dependencies = [
     "sqlalchemy>=2.0.41",
     "tqdm>=4.67.1",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server", "agent", "client", "manager", "lib", "utils"]
+exclude = ["test_files", "runinfo"]
