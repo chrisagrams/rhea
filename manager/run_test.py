@@ -77,9 +77,10 @@ if __name__ == "__main__":
     # tool = tools["a74ca2106a7a2073"] # Not working (macros)
     # tool = tools["593966108c52c584"]
     # tool = tools["f69b601af5ce77b7"]
-    tool = tools["c198b9ec43cfbe0e"]
-    # tool = tools["8e36777d470b3c19"] # Not working (configfile)
+    # tool = tools["c198b9ec43cfbe0e"]
+    tool = tools["8e36777d470b3c19"]
     # tool = tools["fa1c79f582a17d50"] # Not working (configfile)
+    # tool = tools["c8658b82d8429f5d"]
 
     tool_results = run_tool_tests(tool)
 
