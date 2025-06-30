@@ -15,7 +15,23 @@ from dataclasses import dataclass
 from Cheetah.Template import Template
 from types import SimpleNamespace
 
+class GalaxyVar(str):
+    def __new__(cls, value):
+        obj = super().__new__(cls, value)
+        obj._nested = {}
+        return obj
 
+    def __getattr__(self, name):
+        try:
+            return self._nested[name]
+        except KeyError:
+            raise AttributeError(f"{name!r}")
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def set_nested(self, name, value):
+        self._nested[name] = value
 
 class RheaParam:
     def __init__(self, name: str, type: str, argument: str | None = None) -> None:
@@ -92,10 +108,12 @@ class RheaFileParam(RheaParam):
         format: str,
         value: RedisKey,
         argument: str | None = None,
+        filename: str | None = None,
     ) -> None:
         super().__init__(name, type, argument)
         self.format = format
         self.value = value
+        self.filename = filename
 
     @classmethod
     def from_param(cls, param: Param, value: RedisKey) -> "RheaFileParam":
@@ -463,42 +481,41 @@ class RheaToolAgent(Behavior):
 
         self.tool.command = pattern.sub(_repl, self.tool.command)
 
-    def expand_galaxy_if(self, cmd: str, env: dict[str, str]) -> str:
-        context: dict[str, Any] = {}
-        for full_name, value in env.items():
-            parts = full_name.split('.')
-            cur = context
-            for p in parts[:-1]:
-                cur = cur.setdefault(p, {})
-            cur[parts[-1]] = value
+    
 
+    def expand_galaxy_if(self, cmd: str, env: dict[str, str]) -> str:
         var_pattern = re.compile(r'\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?')
         vars_ = sorted(set(var_pattern.findall(cmd)),
                     key=lambda v: v.count('.'),
                     reverse=True)
-
         nested_roots = {v.split('.')[0] for v in vars_ if '.' in v}
+
+        context: dict[str, GalaxyVar] = {}
+        for k, v in env.items():
+            if '.' not in k:
+                context[k] = GalaxyVar(v)
+
+        for k, v in env.items():
+            if '.' in k:
+                root, rest = k.split('.', 1)
+                context.setdefault(root, GalaxyVar('')).set_nested(rest, v)
 
         for var in vars_:
             parts = var.split('.')
             if len(parts) == 1:
                 root = parts[0]
                 if root not in nested_roots and root not in context:
-                    context[root] = ''
+                    context[root] = GalaxyVar('')
             else:
-                cur = context
-                for p in parts[:-1]:
-                    if p not in cur or not isinstance(cur[p], dict):
-                        cur[p] = {}
-                    cur = cur[p]
-                cur.setdefault(parts[-1], '')
-        # Remove any .get() calls
+                root, nested = parts[0], parts[1]
+                context.setdefault(root, GalaxyVar('')).set_nested(nested, '')
+
         cmd = re.sub(r'\.get\([^)]*\)', '', cmd)
-        # Remove any .strip() calls
         cmd = re.sub(r'\.strip\([^)]*\)', '', cmd)
+
         tmpl = Template(source=cmd, searchList=[context])
         return tmpl.respond()
-
+    
     def unescape_bash_vars(self, cmd: str) -> str:
         """
         Turn every '\\$foo' into '$foo' so that bash will expand it at runtime.
@@ -566,7 +583,7 @@ class RheaToolAgent(Behavior):
                     else:
                         raise KeyError(
                             f"No file associated with key {param.value}"
-                        )
+                        )                
                 if param.name in env: # If the param is already populated, its most likely a list of files
                     #TODO: Fix type errors (this should be safe)
                     prev = env[param.name]
@@ -577,6 +594,11 @@ class RheaToolAgent(Behavior):
                         env[param.name].append(prev)
                 else:
                     env[param.name] = tmp_file_path
+                
+                if param.filename is not None:
+                    extension = param.filename.split(".")[-1]
+                    env[f"{param.name}.ext"] = extension
+                        
             elif isinstance(param, RheaBooleanParam):
                 if param.checked or param.value:
                     value = param.truevalue

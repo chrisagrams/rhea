@@ -1,6 +1,6 @@
 from typing import List, Any
 from utils.schema import Tool, Test, Param, Conditional, Section
-from agent.tool import RheaParam, RheaOutput, RheaDataOutput
+from agent.tool import RheaParam, RheaOutput, RheaDataOutput, RheaFileParam
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from minio import Minio
@@ -41,7 +41,10 @@ def get_test_file_from_store(
                 content = resp.read()
                 proxy = input_store.proxy(content)
                 key = get_key(proxy)
-                return RheaParam.from_param(input_param, key)
+                p = RheaParam.from_param(input_param, key)
+                if isinstance(p, RheaFileParam):
+                    p.filename = object_name.split("/")[-1]
+                return p
     raise ValueError(f"{test_param.value} not found in bucket.")
 
 
@@ -102,6 +105,8 @@ def populate_defaults(param: Param, collection: Conditional | Section) -> List[R
         result.extend(
             populate_regular_and_conditional(param, collection.name, param.value)
         )
+    elif param.optional:
+        return result
     else:
         raise NotImplementedError(f"Param of type {param.type} not implemented.")
 
