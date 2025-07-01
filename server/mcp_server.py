@@ -37,7 +37,7 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 chroma_client = chromadb.HttpClient(host="localhost", port=8001)
 collection = chroma_client.get_or_create_collection(
     name="rhea-tools-v1.3",
-    embedding_function=openai_ef,
+    embedding_function=openai_ef, # type: ignore
 )
 
 
