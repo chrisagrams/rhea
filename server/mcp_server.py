@@ -115,7 +115,7 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
 
 
 @mcp.tool()
-def find_tools(query: str) -> str:
+async def find_tools(query: str, ctx: Context) -> str:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
 
     # Clear previous tools (except find_tools)
@@ -219,6 +219,7 @@ def find_tools(query: str) -> str:
         # Add tool to MCP server
         mcp.add_tool(fn, name=str(t.name), description=str(t.description))
 
+    await ctx.request_context.session.send_tool_list_changed() # notifiactions/tools/list_changed
     session.close()
     return f"Populated {len(retrieved)} tools."
 
