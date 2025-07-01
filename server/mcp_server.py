@@ -10,7 +10,11 @@ from sqlalchemy import create_engine
 from inspect import Signature, Parameter
 from typing import List, Optional
 import pickle
+import debugpy
 
+debugpy.listen(("0.0.0.0", 5680))
+print("Waiting for VS Code to attach on port 5680")
+debugpy.wait_for_client()
 
 DB_PATH = "/Users/chrisgrams/Notes/Argonne/Galaxy-Tools-DB/db/Galaxy_Tools_filtered.db"
 
@@ -128,6 +132,7 @@ def find_tools(query: str) -> str:
 
         def make_wrapper(tool_id, param_names):
             def wrapper(*args, **kwargs):
+                tool: Tool = galaxy_tools[tool_id]
                 for name, value in zip(param_names, args):
                     kwargs.setdefault(name, value)
 
