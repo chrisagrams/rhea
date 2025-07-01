@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from lib.academy.academy.exchange.redis import RedisExchangeFactory
 from lib.academy.academy.identifier import AgentId
 import chromadb
@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from utils.models import Tool as GalaxyTool
 from utils.models import Base
 from utils.schema import Tool, Param, Inputs
-from agent.tool import RheaToolAgent, RheaParam
+from agent.tool import RheaToolAgent, RheaParam, RheaOutput
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
 from sqlalchemy import create_engine
@@ -142,16 +142,35 @@ def find_tools(query: str) -> str:
             continue
 
         params = construct_params(tool.inputs)
+
+        # Add Context to tool params
+        params.append(
+            Parameter(
+                "ctx",
+                kind=Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=Context
+            )
+        )
+
         sig = Signature(parameters=params, return_annotation=List[str])
 
         def make_wrapper(tool_id, param_names):
-            def wrapper(*args, **kwargs):
+            async def wrapper(*args, **kwargs):
                 tool: Tool = galaxy_tools[tool_id]
+
+                # Get context
+                ctx: Context = kwargs.pop("ctx")
+                ctx.info(f"Launching tool {tool_id}")
+                await ctx.report_progress(0, 1)
+
                 for name, value in zip(param_names, args):
                     kwargs.setdefault(name, value)
 
                 # Construct RheaParams 
                 rhea_params = process_user_inputs(tool.inputs, kwargs)
+
+                ctx.info(f"Launching agent {agents[tool_id]}")
+                await ctx.report_progress(0.05, 1)
 
                 # Launch agent
                 launch_agent(
@@ -162,17 +181,26 @@ def find_tools(query: str) -> str:
                     minio_endpoint="host.docker.internal:9000",
                     minio_access_key="admin",
                     minio_secret_key="password",
-                    minio_secure=False
+                    minio_secure=False,
                 )
 
                 # Get agent handle
                 handle = client.get_handle(agents[tool.id])
 
-                # Execute tool
-                tool_result = handle.run_tool(rhea_params).result()
+                ctx.info(f"Executing tool {tool_id} in {agents[tool_id]}")
+                await ctx.report_progress(0.1, 1)
 
-                # TODO: Process tool output and return
-                return ["Hello world!"]
+                # Execute tool
+                tool_result: RheaOutput = handle.run_tool(rhea_params).result()
+
+                ctx.info(f"Tool {tool_id} finished in {agents[tool_id]}")
+                await ctx.report_progress(1, 1)
+
+                res = []
+                if tool_result.files is not None:
+                    for f in tool_result.files:
+                        res.append(str(f.key))
+                return res
 
             return wrapper
 
