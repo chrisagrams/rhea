@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from utils.models import Tool as GalaxyTool
 from utils.models import Base
 from utils.schema import Tool, Param, Inputs
-from agent.tool import RheaToolAgent, RheaParam, RheaOutput
+from agent.tool import RheaToolAgent, RheaParam, RheaOutput, RheaDataOutput
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
 from sqlalchemy import create_engine
@@ -50,6 +50,45 @@ collection = chroma_client.get_or_create_collection(
     name="rhea-tools-v1.3",
     embedding_function=openai_ef, # type: ignore
 )
+
+
+
+class MCPDataOutput(BaseModel):
+    key: str
+    size: int
+    filename: str
+    name: Optional[str] = None
+
+    @classmethod
+    def from_rhea(cls, p: RheaDataOutput):
+        return cls(
+            key=p.key.redis_key,
+            size=p.size,
+            filename=p.filename,
+            name=p.name
+        )
+
+
+class MCPOutput(BaseModel):
+    return_code: int
+    stdout: str
+    stderr: str
+    files: Optional[List[MCPDataOutput]] = None
+
+    @classmethod
+    def from_rhea(cls, p: RheaOutput):
+        files = None
+        if p.files is not None:
+            files = []
+            for f in p.files:
+                files.append(MCPDataOutput.from_rhea(f))
+        return cls(
+            return_code=p.return_code,
+            stdout=p.stdout,
+            stderr=p.stderr,
+            files=files
+        )
+    
 
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
@@ -152,7 +191,7 @@ async def find_tools(query: str, ctx: Context) -> str:
             )
         )
 
-        sig = Signature(parameters=params, return_annotation=List[str])
+        sig = Signature(parameters=params, return_annotation=MCPOutput)
 
         def make_wrapper(tool_id, param_names):
             async def wrapper(*args, **kwargs):
@@ -196,11 +235,9 @@ async def find_tools(query: str, ctx: Context) -> str:
                 ctx.info(f"Tool {tool_id} finished in {agents[tool_id]}")
                 await ctx.report_progress(1, 1)
 
-                res = []
-                if tool_result.files is not None:
-                    for f in tool_result.files:
-                        res.append(str(f.key))
-                return res
+                result = MCPOutput.from_rhea(tool_result)
+
+                return result
 
             return wrapper
 
@@ -211,7 +248,7 @@ async def find_tools(query: str, ctx: Context) -> str:
         fn.__signature__ = sig  # type: ignore[attr-defined]
 
         fn.__annotations__ = {p.name: p.annotation for p in params}
-        fn.__annotations__["return"] = List[str]
+        fn.__annotations__["return"] = MCPOutput
 
         # Register agent
         agents[tool.id] = client.register_agent(RheaToolAgent, name=tool.name)
