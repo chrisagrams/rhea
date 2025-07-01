@@ -1,19 +1,25 @@
 from mcp.server.fastmcp import FastMCP
+from lib.academy.academy.exchange.redis import RedisExchangeFactory
+from lib.academy.academy.identifier import AgentId
 import chromadb
 from chromadb.utils import embedding_functions
 from sqlalchemy.orm import sessionmaker
 from utils.models import Tool as GalaxyTool
 from utils.models import Base
 from utils.schema import Tool, Param, Inputs
-from agent.tool import RheaParam
+from agent.tool import RheaToolAgent, RheaParam
+from manager.parsl_config import config
+from manager.launch_agent import launch_agent
 from sqlalchemy import create_engine
 from inspect import Signature, Parameter
-from typing import List, Optional
+from typing import List, Optional, Annotated
+from pydantic import BaseModel, Field
+from proxystore.connectors.redis import RedisKey
 import pickle
 import debugpy
 
-debugpy.listen(("0.0.0.0", 5680))
-print("Waiting for VS Code to attach on port 5680")
+debugpy.listen(("0.0.0.0", 5681))
+print("Waiting for VS Code to attach on port 5681")
 debugpy.wait_for_client()
 
 DB_PATH = "/Users/chrisgrams/Notes/Argonne/Galaxy-Tools-DB/db/Galaxy_Tools_filtered.db"
@@ -28,6 +34,11 @@ with open("../tools_dict.pkl", "rb") as f:
 
 mcp = FastMCP("Rhea")
 
+factory = RedisExchangeFactory("localhost", 6379)
+client = factory.bind_as_client(name="mcp-manager")
+
+agents: dict[str, AgentId[RheaToolAgent]] = {}
+
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key="aaaa",
     api_base="http://localhost:8000/v1",
@@ -39,10 +50,6 @@ collection = chroma_client.get_or_create_collection(
     name="rhea-tools-v1.3",
     embedding_function=openai_ef, # type: ignore
 )
-
-
-def dummy_function(input: str) -> str:
-    return "echo"
 
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
@@ -75,7 +82,10 @@ def construct_params(inputs: Inputs) -> List[Parameter]:
                 Parameter(
                     param.name,
                     kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Optional[bool] if param.optional else bool,
+                    annotation=Annotated[
+                        Optional[bool] if param.optional else bool,
+                        Field(description=param.help)
+                    ],
                 )
             )
         elif param.type == "data":
@@ -94,8 +104,12 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
 
     for param in inputs.params:
         a = args.get(param.name, None)
+    
         if a is not None:
-            res.append(RheaParam.from_param(param, a))
+            if param.type == "data":
+                res.append(RheaParam.from_param(param, RedisKey(a)))
+            else:
+                res.append(RheaParam.from_param(param, a))
 
     return res
 
@@ -136,13 +150,33 @@ def find_tools(query: str) -> str:
                 for name, value in zip(param_names, args):
                     kwargs.setdefault(name, value)
 
+                # Construct RheaParams 
                 rhea_params = process_user_inputs(tool.inputs, kwargs)
 
-                # TODO: Call agent here
+                # Launch agent
+                launch_agent(
+                    agents[tool.id],
+                    tool,
+                    redis_host="host.docker.internal",
+                    redis_port=6379,
+                    minio_endpoint="host.docker.internal:9000",
+                    minio_access_key="admin",
+                    minio_secret_key="password",
+                    minio_secure=False
+                )
+
+                # Get agent handle
+                handle = client.get_handle(agents[tool.id])
+
+                # Execute tool
+                tool_result = handle.run_tool(rhea_params).result()
+
+                # TODO: Process tool output and return
                 return ["Hello world!"]
 
             return wrapper
 
+        # Create tool.call()
         fn = make_wrapper(tool.id, [name for name in params])
         fn.__name__ = tool.name
         fn.__doc__ = tool.description
@@ -150,6 +184,11 @@ def find_tools(query: str) -> str:
 
         fn.__annotations__ = {p.name: p.annotation for p in params}
         fn.__annotations__["return"] = List[str]
+
+        # Register agent
+        agents[tool.id] = client.register_agent(RheaToolAgent, name=tool.name)
+
+        # Add tool to MCP server
         mcp.add_tool(fn, name=str(t.name), description=str(t.description))
 
     session.close()
