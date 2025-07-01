@@ -389,7 +389,7 @@ class RheaToolAgent(Behavior):
             # Best-effort try installing the latest available package if our first attempt failed.
             print("Best-effort installing packages...")
             packages = [p.replace("=", ">=") for p in packages]
-            cmd = ["conda", "install", "-n", self.tool.id, "-y"] + packages
+            cmd = ["conda", "create", "-n", self.tool.id, "-y"] + packages
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Error installing Conda packages: {result.stdout}")
