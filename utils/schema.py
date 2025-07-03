@@ -256,6 +256,7 @@ class Param(BaseModel):
     falsevalue: Optional[str] = None
     checked: Optional[bool] = None
     options: Optional[List[Option]] = None
+    description: Optional[str] = None # An LLM-generated description of the Parameter
 
 
 class When(BaseModel):
@@ -577,6 +578,7 @@ class Tool(BaseModel):
     version: str
     profile: str
     description: str
+    long_description: Optional[str] = None
     macros: Macros
     xrefs: Xrefs
     requirements: Requirements
