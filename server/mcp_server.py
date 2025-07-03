@@ -105,7 +105,10 @@ def construct_params(inputs: Inputs) -> List[Parameter]:
                 Parameter(
                     param.name,
                     kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Optional[str] if param.optional else str,
+                    annotation=Annotated[
+                        Optional[str] if param.optional else str,
+                        Field(description=param.description)
+                    ]
                 )
             )
         elif param.type == "select":
@@ -113,7 +116,10 @@ def construct_params(inputs: Inputs) -> List[Parameter]:
                 Parameter(
                     param.name,
                     kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Optional[str] if param.optional else str,
+                    annotation=Annotated[
+                        Optional[str] if param.optional else str,
+                        Field(description=param.description)
+                    ]
                 )
             )
         elif param.type == "boolean":
@@ -123,7 +129,7 @@ def construct_params(inputs: Inputs) -> List[Parameter]:
                     kind=Parameter.POSITIONAL_OR_KEYWORD,
                     annotation=Annotated[
                         Optional[bool] if param.optional else bool,
-                        Field(description=param.help)
+                        Field(description=param.description)
                     ],
                 )
             )
@@ -132,7 +138,10 @@ def construct_params(inputs: Inputs) -> List[Parameter]:
                 Parameter(
                     param.name,
                     kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Optional[str] if param.optional else str,
+                    annotation=Annotated[
+                        Optional[str] if param.optional else str,
+                        Field(description=param.description)
+                    ],
                 )
             )
     return res
