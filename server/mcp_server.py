@@ -15,42 +15,60 @@ from inspect import Signature, Parameter
 from typing import List, Optional, Annotated
 from pydantic import BaseModel, Field
 from proxystore.connectors.redis import RedisKey
+from dotenv import load_dotenv
+import os
 import pickle
 import debugpy
 
-debugpy.listen(("0.0.0.0", 5681))
-print("Waiting for VS Code to attach on port 5681")
-debugpy.wait_for_client()
+load_dotenv()
 
-DB_PATH = "/Users/chrisgrams/Notes/Argonne/Galaxy-Tools-DB/db/Galaxy_Tools_filtered.db"
+debug_port = os.environ.get("DEBUG_PORT")
+pickle_file = os.environ.get("PICKLE_FILE", "../tools_dict.pkl")
+redis_host = os.environ.get("REDIS_HOST", "localhost")
+redis_port = int(os.environ.get("REDIS_PORT", "6379"))
+vllm_key = os.environ.get("VLLM_KEY", "abc123")
+vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
+model = os.environ.get("MODEL", "Qwen/Qwen3-Embedding-0.6B")
+chroma_host = os.environ.get("CHROMA_HOST", "localhost")
+chroma_port = int(os.environ.get("CHROMA_PORT", "8001"))
+chroma_collection = os.environ.get("CHROMA_COLLECTION")
+agent_redis_host = os.environ.get("AGENT_REDIS_HOST", "localhost")
+agent_redis_port = int(os.environ.get("AGENT_REDIS_PORT", "6379"))
+minio_endpoint = os.environ.get("MINIO_ENDPOINT", "localhost")
+minio_access_key = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+minio_secret_key = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
 
-engine = create_engine(f"sqlite:///{DB_PATH}")
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+if debug_port:
+    debugpy.listen(("0.0.0.0", int(debug_port)))
+    print(f"Waiting for VS Code to attach on port {int(debug_port)}")
+    debugpy.wait_for_client()
 
 galaxy_tools: dict[str, Tool] = {}
 
-with open("../tools_dict.pkl", "rb") as f:
+with open(pickle_file, "rb") as f:
     galaxy_tools = pickle.load(f)
 
 mcp = FastMCP("Rhea")
 
-factory = RedisExchangeFactory("localhost", 6379)
+factory = RedisExchangeFactory(redis_host, redis_port)
 client = factory.bind_as_client(name="mcp-manager")
 
 agents: dict[str, AgentId[RheaToolAgent]] = {}
 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key="aaaa",
-    api_base="http://localhost:8000/v1",
-    model_name="Qwen/Qwen3-Embedding-0.6B",
+    api_key=vllm_key,
+    api_base=vllm_url,
+    model_name=model,
 )
 
-chroma_client = chromadb.HttpClient(host="localhost", port=8001)
+chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+if chroma_collection is None:
+    raise ValueError("Environment variable 'chroma_collection' is not set.")
+
 collection = chroma_client.get_or_create_collection(
-    name="rhea-tools-v1.3",
+    name=chroma_collection,
     embedding_function=openai_ef, # type: ignore
 )
-
 
 
 class MCPDataOutput(BaseModel):
@@ -179,13 +197,11 @@ async def find_tools(query: str, ctx: Context) -> str:
     )
     retrieved = res["ids"][0]
 
-    session = SessionLocal()
-    tools = session.query(GalaxyTool).filter(GalaxyTool.id.in_(retrieved)).all()
 
     # Populate tools
-    for t in tools:
+    for t in retrieved:
         try:
-            tool = galaxy_tools[str(t.id)]
+            tool = galaxy_tools[t]
         except KeyError as e:
             continue
 
@@ -224,11 +240,11 @@ async def find_tools(query: str, ctx: Context) -> str:
                 launch_agent(
                     agents[tool.id],
                     tool,
-                    redis_host="host.docker.internal",
-                    redis_port=6379,
-                    minio_endpoint="host.docker.internal:9000",
-                    minio_access_key="admin",
-                    minio_secret_key="password",
+                    redis_host=agent_redis_host,
+                    redis_port=agent_redis_port,
+                    minio_endpoint=minio_endpoint,
+                    minio_access_key=minio_access_key,
+                    minio_secret_key=minio_secret_key,
                     minio_secure=False,
                 )
 
@@ -263,10 +279,9 @@ async def find_tools(query: str, ctx: Context) -> str:
         agents[tool.id] = client.register_agent(RheaToolAgent, name=tool.name)
 
         # Add tool to MCP server
-        mcp.add_tool(fn, name=str(t.name), description=str(t.description))
+        mcp.add_tool(fn, name=tool.name, description=tool.description)
 
     await ctx.request_context.session.send_tool_list_changed() # notifiactions/tools/list_changed
-    session.close()
     return f"Populated {len(retrieved)} tools."
 
 
