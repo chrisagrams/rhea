@@ -1,0 +1,102 @@
+name: Build and Push
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ${{ github.repository_owner }}/rhea-worker
+
+jobs:
+  build-and-push-docker:
+    runs-on: ubuntu-latest
+    outputs:
+      image_ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker image
+        id: docker
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.agent
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_NAME }}-agent:latest
+            ghcr.io/${{ env.IMAGE_NAME }}-agent:${{ github.sha }}
+
+  build-and-push-apptainer:
+    needs: build-and-push-docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) \
+                signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+                https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: Install Apptainer
+        run: |
+          curl -fsSL -o apptainer.deb \
+            "https://github.com/apptainer/apptainer/releases/download/v1.4.1/apptainer_1.4.1_amd64.deb"
+          sudo apt-get update
+          sudo apt-get install -y ./apptainer.deb
+          apptainer --version
+
+      - name: Install ORAS
+        run: |
+          curl -fsSL \
+            "https://github.com/oras-project/oras/releases/download/v1.2.3/oras_1.2.3_linux_amd64.tar.gz" \
+            -o oras.tar.gz
+          tar -xzf oras.tar.gz
+          sudo mv oras /usr/local/bin/oras
+          sudo chmod +x /usr/local/bin/oras
+          oras version
+
+
+      - name: Log in to GHCR for ORAS
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull Docker image and build SIF
+        run: |
+          apptainer build rhea-agent.sif docker://ghcr.io/${{ env.IMAGE_NAME }}-agent:${{ github.sha }}
+
+      - name: Push SIF to GHCR (OCI)
+        run: |
+          apptainer push rhea-agent.sif oras://ghcr.io/${{ env.IMAGE_NAME }}-agent-sif:${{ github.sha }}
+
+      - name: Verify SIF pushed
+        run: |
+          echo "Singularity image at: oras://ghcr.io/${{ env.IMAGE_NAME }}-agent-sif:${{ github.sha }}"
