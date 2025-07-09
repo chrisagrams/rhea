@@ -1,5 +1,7 @@
 FROM debian:stable-slim
 
+LABEL org.opencontainers.image.source https://github.com/chrisagrams/rhea
+
 ARG TARGETARCH
 
 ENV MINICONDA_HOME=/home/rhea/conda \
