@@ -14,14 +14,12 @@ from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
 from chromadb.api.types import EmbeddingFunction, Embeddable
-from sqlalchemy.orm import sessionmaker
 from utils.models import Tool as GalaxyTool
 from utils.models import Base
 from utils.schema import Tool, Param, Inputs
 from agent.tool import RheaToolAgent, RheaParam, RheaOutput, RheaDataOutput
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
-from sqlalchemy import create_engine
 from inspect import Signature, Parameter
 from typing import List, Optional, Annotated
 from pydantic import BaseModel, Field
