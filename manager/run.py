@@ -1,5 +1,8 @@
 import os
-from lib.academy.academy.exchange.redis import RedisExchangeFactory
+import asyncio
+from academy.logging import init_logging
+from academy.exchange.redis import RedisExchangeFactory
+from academy.handle import UnboundRemoteHandle, RemoteHandle
 from agent.tool import (
     RheaToolAgent,
     RheaParam,
@@ -21,9 +24,9 @@ from minio import Minio
 logging.basicConfig(level=logging.INFO)
 
 
-if __name__ == "__main__":
+async def main():
     with open("tools_dict.pkl", "rb") as f:
-        tools = pickle.load(f)
+            tools = pickle.load(f)
     tool = tools["204bd0ff6499fcca"]
     connector = RedisConnector("localhost", 6379)
 
@@ -32,9 +35,6 @@ if __name__ == "__main__":
             buffer = f.read()
             proxy = input_store.proxy(buffer)
             key = get_key(proxy)
-
-            factory = RedisExchangeFactory("localhost", 6379)
-            client = factory.bind_as_client(name="manager")
 
             rhea_params = []
             for param in tool.inputs.params:
@@ -45,9 +45,12 @@ if __name__ == "__main__":
                 elif param.name == "header":
                     rhea_params.append(RheaParam.from_param(param, True))
 
-            agent_id = client.register_agent(RheaToolAgent, name=tool.name)
-            fut = launch_agent(
-                agent_id,
+            # Need to create a client to communicate w/ agent
+            factory = RedisExchangeFactory("localhost", 6379)
+            client = await factory.create_user_client(name="rhea-manager")
+
+
+            future_handle = launch_agent(
                 tool,
                 redis_host="host.docker.internal",
                 redis_port=6379,
@@ -56,11 +59,14 @@ if __name__ == "__main__":
                 minio_secret_key="password",
                 minio_secure=False,
             )
-            handle = client.get_handle(agent_id)
 
-            packages = handle.get_installed_packages().result()
+            unbound_handle: UnboundRemoteHandle = future_handle.result()
 
-            tool_result = handle.run_tool(rhea_params).result()
+            handle: RemoteHandle = unbound_handle.bind_to_client(client)
+
+            packages = await ( await handle.get_installed_packages() )
+
+            tool_result = await ( await handle.run_tool(rhea_params) )
 
             print(packages)
 
@@ -69,6 +75,12 @@ if __name__ == "__main__":
                     result = output_store.get(result.key)
                     print(result)
 
-            handle.shutdown()
+            await handle.shutdown()
 
             parsl.dfk().cleanup()
+
+
+if __name__ == "__main__":
+    init_logging(logging.INFO)
+
+    asyncio.run(main())
