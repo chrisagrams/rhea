@@ -7,7 +7,8 @@ from academy.identifier import AgentId
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
 from utils.schema import Tool
-from agent.tool import RheaToolAgent, RheaDataOutput, RheaOutput
+from agent.tool import RheaToolAgent
+from agent.schema import RheaDataOutput, RheaOutput
 from pydantic import BaseModel
 from typing import List, Optional
 

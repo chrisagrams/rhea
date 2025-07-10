@@ -2,7 +2,6 @@ import asyncio
 from academy.exchange.redis import RedisExchangeFactory
 from academy.logging import init_logging
 from academy.handle import UnboundRemoteHandle, RemoteHandle
-from agent.tool import RheaToolAgent, RheaParam, RheaOutput, RheaDataOutput
 from utils.schema import Tool, Param, Tests, Test, Conditional
 from utils.process import process_inputs, process_outputs
 from manager.parsl_config import config

@@ -1,9 +1,5 @@
 from parsl import python_app
-from academy.identifier import AgentId
 from utils.schema import Tool
-from proxystore.connectors.redis import RedisConnector
-from minio import Minio
-
 
 @python_app(executors=["docker_workers"])
 def launch_agent(
@@ -16,14 +12,11 @@ def launch_agent(
     minio_secure: bool,
 ):
     import asyncio
-    from uuid import UUID
     from concurrent.futures import ThreadPoolExecutor
     from academy.exchange.redis import RedisExchangeFactory
     from academy.manager import Manager
-    from utils.schema import Tool
     from agent.tool import RheaToolAgent
-    from proxystore.connectors.redis import RedisConnector
-    from minio import Minio
+
 
     async def _do_launch():
         factory = RedisExchangeFactory(hostname=redis_host, port=redis_port)

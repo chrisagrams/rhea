@@ -17,7 +17,7 @@ from chromadb.api.types import EmbeddingFunction, Embeddable
 from utils.models import Base
 from utils.schema import Tool, Inputs
 from server.schema import AppContext, MCPOutput
-from agent.tool import RheaParam, RheaOutput
+from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
 from inspect import Signature, Parameter

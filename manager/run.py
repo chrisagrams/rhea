@@ -3,14 +3,7 @@ import asyncio
 from academy.logging import init_logging
 from academy.exchange.redis import RedisExchangeFactory
 from academy.handle import UnboundRemoteHandle, RemoteHandle
-from agent.tool import (
-    RheaToolAgent,
-    RheaParam,
-    RheaFileParam,
-    RheaTextParam,
-    RheaBooleanParam,
-)
-from utils.schema import Tool
+from agent.schema import RheaParam
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
 from proxystore.connectors.redis import RedisConnector

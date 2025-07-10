@@ -5,7 +5,7 @@ import json
 import os
 import shlex
 from types import SimpleNamespace
-from agent.tool import RheaToolAgent, RheaParam
+from agent.tool import RheaToolAgent
 from utils.schema import Tool, Test
 from utils.process import process_inputs
 from proxystore.connectors.redis import RedisConnector
