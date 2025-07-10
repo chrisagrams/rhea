@@ -47,8 +47,7 @@ RUN conda config --add channels bioconda \
 
 RUN uv venv --python 3.10 /home/rhea/venv \
  && . /home/rhea/venv/bin/activate \
- && uv pip install -e /home/rhea/app/lib/academy \
- && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3
+ && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3 academy-py
 
 COPY utils/ /home/rhea/app/utils
 COPY agent/ /home/rhea/app/agent

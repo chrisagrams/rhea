@@ -1,4 +1,4 @@
-from lib.academy.academy.behavior import Behavior, action, loop
+from academy.agent import Agent, action, loop
 from typing import List, Optional, Any
 from utils.schema import Tool, Param, CollectionOutput, ConfigFile
 import os
@@ -18,7 +18,7 @@ from types import SimpleNamespace
 class GalaxyVar(str):
     def __new__(cls, value):
         obj = super().__new__(cls, value)
-        obj._nested = {}
+        obj._nested = {} #type: ignore
         return obj
 
     def __getattr__(self, name):
@@ -266,7 +266,7 @@ class RheaDataOutput:
 
         size = os.path.getsize(filepath)
         filename = os.path.basename(filepath)
-        return cls(key=key, size=size, filename=filename, name=name)
+        return cls(key=key, size=size, filename=filename, name=name) #type: ignore
 
 
 class RheaOutput:
@@ -336,7 +336,7 @@ class RheaCollectionOuput(RheaOutput):
                 )
 
 
-class RheaToolAgent(Behavior):
+class RheaToolAgent(Agent):
     def __init__(
         self,
         tool: Tool,
@@ -368,7 +368,7 @@ class RheaToolAgent(Behavior):
             secure=minio_secure,
         )
 
-    def on_setup(self) -> None:
+    async def agent_on_startup(self) -> None:
         # Create Conda environment and install Conda packages 
         requirements = self.tool.requirements.requirements
         packages = []
@@ -402,7 +402,7 @@ class RheaToolAgent(Behavior):
         pkg_info = json.loads(result.stdout)
         self.installed_packages = [f"{p['name']}={p['version']}" for p in pkg_info]
 
-    def on_shutdown(self) -> None:
+    async def agent_on_shutdown(self) -> None:
         # Delete Conda environment
         cmd = ["conda", "env", "remove", "-n", self.tool.id]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -410,7 +410,7 @@ class RheaToolAgent(Behavior):
             raise Exception(f"Error deleting Conda environment: {result.stdout}")
 
     @action
-    def get_installed_packages(self) -> List[str]:
+    async def get_installed_packages(self) -> List[str]:
         cmd = ["conda", "list", "-n", self.tool.id, "--json"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -420,7 +420,7 @@ class RheaToolAgent(Behavior):
         return packages
 
     @action
-    def run_version_command(self) -> str | None:
+    async def run_version_command(self) -> str | None:
         if len(self.tool.version_command) > 0:
             with NamedTemporaryFile("w", suffix=".sh", delete=False) as tf:
                 script_path = tf.name
@@ -588,10 +588,10 @@ class RheaToolAgent(Behavior):
                     #TODO: Fix type errors (this should be safe)
                     prev = env[param.name]
                     if isinstance(env[param.name], List):
-                        env[param.name].append(tmp_file_path)
+                        env[param.name].append(tmp_file_path) #type: ignore
                     else:
-                        env[param.name] = []
-                        env[param.name].append(prev)
+                        env[param.name] = [] #type: ignore
+                        env[param.name].append(prev) #type: ignore
                 else:
                     env[param.name] = tmp_file_path
                 
@@ -617,7 +617,7 @@ class RheaToolAgent(Behavior):
                 values = []
                 for p in param.values:
                     values.append(p.value)
-                env[param.name] = values # TODO: Fix type errors here (it must be a List!)
+                env[param.name] = values # TODO: Fix type errors here (it must be a List!) #type: ignore
         
         # For params that were not provided (optional ones), put their default value
         for param in tool_params:
@@ -648,7 +648,7 @@ class RheaToolAgent(Behavior):
             return script_path
 
     @action
-    def run_tool(self, params: List[RheaParam]) -> RheaOutput:
+    async def run_tool(self, params: List[RheaParam]) -> RheaOutput:
         env = os.environ.copy()
         with (
             Store("rhea-input", self.connector, register=True) as input_store,
