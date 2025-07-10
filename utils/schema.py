@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import ClassVar, List, Optional, Sequence, Union, Dict, Any
+from typing import ClassVar, List, Optional, Sequence, Union, Dict, Annotated, Any
 from functools import wraps
 from pydantic import BaseModel, Field
+from inspect import Parameter
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import re
@@ -257,6 +258,26 @@ class Param(BaseModel):
     checked: Optional[bool] = None
     options: Optional[List[Option]] = None
     description: Optional[str] = None # An LLM-generated description of the Parameter
+
+
+    def to_python_parameter(self) -> Parameter:
+        if (self.name is None or self.name == "") and self.argument is not None:
+            self.name = self.argument.replace("--", "")
+        if self.name is None:
+            raise ValueError("Both parameter name and argument is None.")
+        
+        if self.type == "boolean":
+            annotation = Optional[bool] if self.optional else bool
+        else:
+            annotation = Optional[str] if self.optional else str
+
+        return Parameter(
+            name=self.name,
+            kind=Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=Annotated[
+                annotation, Field(description=self.description)
+            ]
+        )
 
 
 class When(BaseModel):

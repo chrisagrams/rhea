@@ -157,60 +157,12 @@ class MCPOutput(BaseModel):
         )
     
 
-
 def construct_params(inputs: Inputs) -> List[Parameter]:
     res = []
     for param in inputs.params:
-        if (param.name is None or param.name == "") and param.argument is not None:
-            param.name = param.argument.replace("--", "")
-
-        if param.name is None:
-            continue
-
-        if param.type == "text":
-            res.append(
-                Parameter(
-                    param.name,
-                    kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Annotated[
-                        Optional[str] if param.optional else str,
-                        Field(description=param.description)
-                    ]
-                )
-            )
-        elif param.type == "select":
-            res.append(
-                Parameter(
-                    param.name,
-                    kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Annotated[
-                        Optional[str] if param.optional else str,
-                        Field(description=param.description)
-                    ]
-                )
-            )
-        elif param.type == "boolean":
-            res.append(
-                Parameter(
-                    param.name,
-                    kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Annotated[
-                        Optional[bool] if param.optional else bool,
-                        Field(description=param.description)
-                    ],
-                )
-            )
-        elif param.type == "data":
-            res.append(
-                Parameter(
-                    param.name,
-                    kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=Annotated[
-                        Optional[str] if param.optional else str,
-                        Field(description=param.description)
-                    ],
-                )
-            )
+        res.append(
+            param.to_python_parameter()
+        )
     return res
 
 
