@@ -1,36 +1,29 @@
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from typing import cast
-from mcp.server.fastmcp import FastMCP, Context
-from academy.exchange import UserExchangeClient
-from academy.handle import UnboundRemoteHandle, RemoteHandle
-from academy.exchange.redis import RedisExchangeFactory
-from academy.identifier import AgentId
-from academy.logging import init_logging
-import chromadb
-from chromadb.utils import embedding_functions
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-from chromadb.api import ClientAPI
-from chromadb.api.models.Collection import Collection
-from chromadb.api.types import EmbeddingFunction, Embeddable
-from utils.models import Tool as GalaxyTool
-from utils.models import Base
-from utils.schema import Tool, Param, Inputs
-from agent.tool import RheaToolAgent, RheaParam, RheaOutput, RheaDataOutput
-from manager.parsl_config import config
-from manager.launch_agent import launch_agent
-from inspect import Signature, Parameter
-from typing import List, Optional, Annotated
-from pydantic import BaseModel, Field
-from proxystore.connectors.redis import RedisKey
-from dotenv import load_dotenv
 import parsl
 import os
 import pickle
 import debugpy
 import logging
-from logging import Logger
+import chromadb
+from typing import cast
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from mcp.server.fastmcp import FastMCP, Context
+from academy.exchange import UserExchangeClient
+from academy.handle import UnboundRemoteHandle, RemoteHandle
+from academy.exchange.redis import RedisExchangeFactory
+from academy.logging import init_logging
+from chromadb.utils import embedding_functions
+from chromadb.api.types import EmbeddingFunction, Embeddable
+from utils.models import Base
+from utils.schema import Tool, Inputs
+from server.schema import AppContext, MCPOutput
+from agent.tool import RheaParam, RheaOutput
+from manager.parsl_config import config
+from manager.launch_agent import launch_agent
+from inspect import Signature, Parameter
+from typing import List, Optional
+from proxystore.connectors.redis import RedisKey
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -55,17 +48,6 @@ if debug_port:
     print(f"Waiting for VS Code to attach on port {int(debug_port)}")
     debugpy.wait_for_client()
 
-@dataclass
-class AppContext:
-    logger: Logger
-    chroma_client: ClientAPI
-    openai_ef: OpenAIEmbeddingFunction
-    collection: Collection
-    factory: RedisExchangeFactory
-    academy_client: UserExchangeClient
-    galaxy_tools: dict[str, Tool]
-    agents: dict[str, AgentId[RheaToolAgent]]
-  
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
@@ -118,43 +100,6 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 
 mcp = FastMCP("Rhea", lifespan=app_lifespan)
-
-
-class MCPDataOutput(BaseModel):
-    key: str
-    size: int
-    filename: str
-    name: Optional[str] = None
-
-    @classmethod
-    def from_rhea(cls, p: RheaDataOutput):
-        return cls(
-            key=p.key.redis_key,
-            size=p.size,
-            filename=p.filename,
-            name=p.name
-        )
-
-
-class MCPOutput(BaseModel):
-    return_code: int
-    stdout: str
-    stderr: str
-    files: Optional[List[MCPDataOutput]] = None
-
-    @classmethod
-    def from_rhea(cls, p: RheaOutput):
-        files = None
-        if p.files is not None:
-            files = []
-            for f in p.files:
-                files.append(MCPDataOutput.from_rhea(f))
-        return cls(
-            return_code=p.return_code,
-            stdout=p.stdout,
-            stderr=p.stderr,
-            files=files
-        )
     
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
