@@ -19,7 +19,6 @@ RUN sed -i '/en_US.UTF-8/s/^# *//' /etc/locale.gen \
 RUN useradd -m -s /bin/bash rhea
 
 
-COPY lib/academy /home/rhea/app/lib/academy
 RUN chown -R rhea:rhea /home/rhea/app
 
 USER rhea
