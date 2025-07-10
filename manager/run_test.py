@@ -1,5 +1,7 @@
-from lib.academy.academy.exchange.redis import RedisExchangeFactory
-from agent.tool import RheaToolAgent, RheaParam, RheaOutput, RheaDataOutput
+import asyncio
+from academy.exchange.redis import RedisExchangeFactory
+from academy.logging import init_logging
+from academy.handle import UnboundRemoteHandle, RemoteHandle
 from utils.schema import Tool, Param, Tests, Test, Conditional
 from utils.process import process_inputs, process_outputs
 from manager.parsl_config import config
@@ -24,17 +26,17 @@ minio_client = Minio(
 
 connector = RedisConnector("localhost", 6379)
 factory = RedisExchangeFactory("localhost", 6379)
-client = factory.bind_as_client(name="manager")
 
 
-def run_tool_tests(tool: Tool) -> List[bool]:
-    tool_id = tool.id
+async def run_tool_tests(tool: Tool) -> List[bool]:
+
+    # Need to create a client to communicate w/ agent
+    client = await factory.create_user_client(name="rhea-manager")
+
     test_results = []
 
     # Register and start agent
-    agent_id = client.register_agent(RheaToolAgent, name=tool.name)
-    fut = launch_agent(
-        agent_id,
+    future_handle = launch_agent(
         tool,
         redis_host="host.docker.internal",
         redis_port=6379,
@@ -43,7 +45,10 @@ def run_tool_tests(tool: Tool) -> List[bool]:
         minio_secret_key="password",
         minio_secure=False,
     )
-    handle = client.get_handle(agent_id)
+
+    unbound_handle: UnboundRemoteHandle = future_handle.result()
+
+    handle: RemoteHandle = unbound_handle.bind_to_client(client)
 
     # Run tests
     for test in tool.tests.tests:
@@ -54,7 +59,9 @@ def run_tool_tests(tool: Tool) -> List[bool]:
         # Populate RheaParams
         tool_params = process_inputs(tool, test, connector, minio_client, minio_bucket)
 
-        tool_result = handle.run_tool(tool_params).result()
+        tool_result_future = await handle.run_tool(tool_params)
+
+        tool_result = await tool_result_future
 
         # Get outputs
         test_result = process_outputs(tool, test, connector, tool_result)
@@ -65,23 +72,25 @@ def run_tool_tests(tool: Tool) -> List[bool]:
         test_results.append(test_result)
 
     # Shut down tool agent
-    handle.shutdown()
+    await handle.shutdown()
 
     return test_results
 
 
 if __name__ == "__main__":
+    init_logging(logging.INFO)
+
     with open("tools_dict.pkl", "rb") as f:
         tools = pickle.load(f)
-    # tool = tools["783bde422b425bd9"]
+    tool = tools["783bde422b425bd9"]
     # tool = tools["a74ca2106a7a2073"] # Not working (macros)
     # tool = tools["593966108c52c584"]
     # tool = tools["f69b601af5ce77b7"]
     # tool = tools["c198b9ec43cfbe0e"]
-    tool = tools["8e36777d470b3c19"]
+    # tool = tools["8e36777d470b3c19"]
     # tool = tools["fa1c79f582a17d50"] # Not working (configfile)
     # tool = tools["c8658b82d8429f5d"]
 
-    tool_results = run_tool_tests(tool)
+    tool_results = asyncio.run(run_tool_tests(tool))
 
     parsl.dfk().cleanup()

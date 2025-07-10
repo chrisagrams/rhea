@@ -1,6 +1,6 @@
 from typing import List, Any
 from utils.schema import Tool, Test, Param, Conditional, Section
-from agent.tool import RheaParam, RheaOutput, RheaDataOutput, RheaFileParam
+from agent.schema import RheaParam, RheaOutput, RheaDataOutput, RheaFileParam
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from minio import Minio

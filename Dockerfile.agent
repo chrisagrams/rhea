@@ -1,5 +1,7 @@
 FROM debian:stable-slim
 
+LABEL org.opencontainers.image.source=https://github.com/chrisagrams/rhea
+
 ARG TARGETARCH
 
 ENV MINICONDA_HOME=/home/rhea/conda \
@@ -16,8 +18,7 @@ RUN sed -i '/en_US.UTF-8/s/^# *//' /etc/locale.gen \
 
 RUN useradd -m -s /bin/bash rhea
 
-
-COPY lib/academy /home/rhea/app/lib/academy
+RUN mkdir -p /home/rhea/app
 RUN chown -R rhea:rhea /home/rhea/app
 
 USER rhea
@@ -45,8 +46,7 @@ RUN conda config --add channels bioconda \
 
 RUN uv venv --python 3.10 /home/rhea/venv \
  && . /home/rhea/venv/bin/activate \
- && uv pip install -e /home/rhea/app/lib/academy \
- && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3
+ && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3 academy-py
 
 COPY utils/ /home/rhea/app/utils
 COPY agent/ /home/rhea/app/agent
