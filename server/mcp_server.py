@@ -1,8 +1,19 @@
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import cast
 from mcp.server.fastmcp import FastMCP, Context
-from lib.academy.academy.exchange.redis import RedisExchangeFactory
-from lib.academy.academy.identifier import AgentId
+from academy.exchange import UserExchangeClient
+from academy.handle import UnboundRemoteHandle, RemoteHandle
+from academy.exchange.redis import RedisExchangeFactory
+from academy.identifier import AgentId
+from academy.logging import init_logging
 import chromadb
 from chromadb.utils import embedding_functions
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from chromadb.api import ClientAPI
+from chromadb.api.models.Collection import Collection
+from chromadb.api.types import EmbeddingFunction, Embeddable
 from sqlalchemy.orm import sessionmaker
 from utils.models import Tool as GalaxyTool
 from utils.models import Base
@@ -16,9 +27,12 @@ from typing import List, Optional, Annotated
 from pydantic import BaseModel, Field
 from proxystore.connectors.redis import RedisKey
 from dotenv import load_dotenv
+import parsl
 import os
 import pickle
 import debugpy
+import logging
+from logging import Logger
 
 load_dotenv()
 
@@ -43,32 +57,69 @@ if debug_port:
     print(f"Waiting for VS Code to attach on port {int(debug_port)}")
     debugpy.wait_for_client()
 
-galaxy_tools: dict[str, Tool] = {}
+@dataclass
+class AppContext:
+    logger: Logger
+    chroma_client: ClientAPI
+    openai_ef: OpenAIEmbeddingFunction
+    collection: Collection
+    factory: RedisExchangeFactory
+    academy_client: UserExchangeClient
+    galaxy_tools: dict[str, Tool]
+    agents: dict[str, AgentId[RheaToolAgent]]
+  
 
-with open(pickle_file, "rb") as f:
-    galaxy_tools = pickle.load(f)
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    logger = init_logging(logging.INFO)
+    academy_client: Optional[UserExchangeClient] = None
 
-mcp = FastMCP("Rhea")
+    try:
+        chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+        openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+            api_key=vllm_key,
+            api_base=vllm_url,
+            model_name=model,
+        )
 
-factory = RedisExchangeFactory(redis_host, redis_port)
-client = factory.bind_as_client(name="mcp-manager")
+        ef = cast(EmbeddingFunction[Embeddable], openai_ef)
 
-agents: dict[str, AgentId[RheaToolAgent]] = {}
+        if chroma_collection is not None and ef is not None:
+            collection = chroma_client.get_or_create_collection(
+                name=chroma_collection,
+                embedding_function=ef,
+            )
+        else:
+            raise ValueError(
+                "CHROMA_COLLECTION must be set (got None); cannot initialize ChromaDB collection"
+            ) 
+        
+        factory = RedisExchangeFactory(redis_host, redis_port)
+        academy_client = await factory.create_user_client(name="rhea-manager")
 
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=vllm_key,
-    api_base=vllm_url,
-    model_name=model,
-)
+        with open(pickle_file, "rb") as f:
+            galaxy_tools = pickle.load(f)
 
-chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
-if chroma_collection is None:
-    raise ValueError("Environment variable 'chroma_collection' is not set.")
+        yield AppContext(
+            logger=logger,
+            chroma_client=chroma_client,
+            openai_ef=openai_ef,
+            collection=collection,
+            factory=factory,
+            academy_client=academy_client,
+            galaxy_tools=galaxy_tools,
+            agents = {}
+        )
+    except Exception as e:
+        logger.error(e)
 
-collection = chroma_client.get_or_create_collection(
-    name=chroma_collection,
-    embedding_function=openai_ef, # type: ignore
-)
+    finally: # Application shutdown
+        if academy_client is not None:
+            await academy_client.close()
+        parsl.dfk().cleanup()
+
+
+mcp = FastMCP("Rhea", lifespan=app_lifespan)
 
 
 class MCPDataOutput(BaseModel):
@@ -191,7 +242,7 @@ async def find_tools(query: str, ctx: Context) -> str:
             mcp._tool_manager._tools.pop(t)
 
     # Perform RAG
-    res = collection.query(
+    res = ctx.request_context.lifespan_context.collection.query(
         query_texts=[query],
         n_results=10,
     )
@@ -201,7 +252,7 @@ async def find_tools(query: str, ctx: Context) -> str:
     # Populate tools
     for t in retrieved:
         try:
-            tool = galaxy_tools[t]
+            tool = ctx.request_context.lifespan_context.galaxy_tools[t]
         except KeyError as e:
             continue
 
@@ -220,11 +271,12 @@ async def find_tools(query: str, ctx: Context) -> str:
 
         def make_wrapper(tool_id, param_names):
             async def wrapper(*args, **kwargs):
-                tool: Tool = galaxy_tools[tool_id]
-
                 # Get context
                 ctx: Context = kwargs.pop("ctx")
                 ctx.info(f"Launching tool {tool_id}")
+
+                tool: Tool = ctx.request_context.lifespan_context.galaxy_tools[tool_id]
+
                 await ctx.report_progress(0, 1)
 
                 for name, value in zip(param_names, args):
@@ -233,12 +285,10 @@ async def find_tools(query: str, ctx: Context) -> str:
                 # Construct RheaParams 
                 rhea_params = process_user_inputs(tool.inputs, kwargs)
 
-                ctx.info(f"Launching agent {agents[tool_id]}")
                 await ctx.report_progress(0.05, 1)
 
                 # Launch agent
-                launch_agent(
-                    agents[tool.id],
+                future_handle = launch_agent(
                     tool,
                     redis_host=agent_redis_host,
                     redis_port=agent_redis_port,
@@ -248,16 +298,21 @@ async def find_tools(query: str, ctx: Context) -> str:
                     minio_secure=False,
                 )
 
-                # Get agent handle
-                handle = client.get_handle(agents[tool.id])
+                unbound_handle: UnboundRemoteHandle = future_handle.result()
+               
+                handle: RemoteHandle = unbound_handle.bind_to_client(ctx.request_context.lifespan_context.academy_client)
 
-                ctx.info(f"Executing tool {tool_id} in {agents[tool_id]}")
+                ctx.info(f"Lanched agent {handle.agent_id}")
+
+                ctx.request_context.lifespan_context.agents[tool_id] = handle.agent_id
+
+                ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
                 await ctx.report_progress(0.1, 1)
 
                 # Execute tool
-                tool_result: RheaOutput = handle.run_tool(rhea_params).result()
+                tool_result: RheaOutput = await ( await handle.run_tool(rhea_params) )
 
-                ctx.info(f"Tool {tool_id} finished in {agents[tool_id]}")
+                ctx.info(f"Tool {tool_id} finished in {handle.agent_id}")
                 await ctx.report_progress(1, 1)
 
                 result = MCPOutput.from_rhea(tool_result)
@@ -274,9 +329,6 @@ async def find_tools(query: str, ctx: Context) -> str:
 
         fn.__annotations__ = {p.name: p.annotation for p in params}
         fn.__annotations__["return"] = MCPOutput
-
-        # Register agent
-        agents[tool.id] = client.register_agent(RheaToolAgent, name=tool.name)
 
         # Add tool to MCP server
         mcp.add_tool(fn, name=tool.name, description=tool.description)
