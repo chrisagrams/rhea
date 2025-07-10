@@ -1,6 +1,6 @@
 FROM debian:stable-slim
 
-LABEL org.opencontainers.image.source https://github.com/chrisagrams/rhea
+LABEL org.opencontainers.image.source=https://github.com/chrisagrams/rhea
 
 ARG TARGETARCH
 
@@ -18,7 +18,7 @@ RUN sed -i '/en_US.UTF-8/s/^# *//' /etc/locale.gen \
 
 RUN useradd -m -s /bin/bash rhea
 
-
+RUN mkdir -p /home/rhea/app
 RUN chown -R rhea:rhea /home/rhea/app
 
 USER rhea
