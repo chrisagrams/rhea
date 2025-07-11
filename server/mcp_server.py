@@ -4,11 +4,14 @@ import pickle
 import debugpy
 import logging
 import chromadb
+import anyio
 from typing import cast
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.resources.types import TextResource
+from mcp.server.lowlevel import Server
+from mcp.server.stdio import stdio_server
 from academy.exchange import UserExchangeClient
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from academy.exchange.redis import RedisExchangeFactory
@@ -101,7 +104,13 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         parsl.dfk().cleanup()
 
 
+
 mcp = FastMCP("Rhea", lifespan=app_lifespan)
+
+# Manually set notification options
+lowlevel_server: Server = mcp._mcp_server
+lowlevel_server.notification_options.resources_changed = True
+lowlevel_server.notification_options.tools_changed = True
     
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
@@ -251,5 +260,13 @@ async def find_tools(query: str, ctx: Context) -> str:
     return f"Populated {len(retrieved)} tools."
 
 
+async def main():
+    async with stdio_server() as (r, w):
+        init_opts = lowlevel_server.create_initialization_options(
+            lowlevel_server.notification_options,
+            {}
+        )
+        await lowlevel_server.run(r, w, init_opts)
+
 if __name__ == "__main__":
-    mcp.run()
+    anyio.run(main)
