@@ -8,6 +8,7 @@ from typing import cast
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp.resources.types import TextResource
 from academy.exchange import UserExchangeClient
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from academy.exchange.redis import RedisExchangeFactory
@@ -24,6 +25,7 @@ from inspect import Signature, Parameter
 from typing import List, Optional
 from proxystore.connectors.redis import RedisKey
 from dotenv import load_dotenv
+from pydantic.networks import AnyUrl
 
 load_dotenv()
 
@@ -136,6 +138,11 @@ async def find_tools(query: str, ctx: Context) -> str:
         if t != keep:
             mcp._tool_manager._tools.pop(t)
 
+    # Clear previous tool documentations 
+    for r in list(mcp._resource_manager._resources.keys()):
+        if "Documentation" in r:
+            mcp._resource_manager._resources.pop(r)
+
     # Perform RAG
     res = ctx.request_context.lifespan_context.collection.query(
         query_texts=[query],
@@ -147,7 +154,7 @@ async def find_tools(query: str, ctx: Context) -> str:
     # Populate tools
     for t in retrieved:
         try:
-            tool = ctx.request_context.lifespan_context.galaxy_tools[t]
+            tool: Tool = ctx.request_context.lifespan_context.galaxy_tools[t]
         except KeyError as e:
             continue
 
@@ -228,7 +235,19 @@ async def find_tools(query: str, ctx: Context) -> str:
         # Add tool to MCP server
         mcp.add_tool(fn, name=tool.name, description=tool.description)
 
+        # Add documentation resource to MCP server
+        mcp.add_resource(
+            resource = TextResource(
+                uri=AnyUrl(url=f"resource://documentation/{tool.name}"),
+                name=f"{tool.name} Documentation",
+                description=f"Full documentation for {tool.name}",
+                text=tool.documentation if tool.documentation is not None else f"Documentation for '{tool.name}' is not available.",
+                mime_type="text/markdown",
+            )
+        )
+
     await ctx.request_context.session.send_tool_list_changed() # notifiactions/tools/list_changed
+    await ctx.request_context.session.send_resource_list_changed() # notifications/resources/list_changed
     return f"Populated {len(retrieved)} tools."
 
 
