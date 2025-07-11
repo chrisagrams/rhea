@@ -265,6 +265,8 @@ class Param(BaseModel):
             self.name = self.argument.replace("--", "")
         if self.name is None:
             raise ValueError("Both parameter name and argument is None.")
+        if self.name.startswith("-"): # Python parameters can't start with a hyphen 
+            self.name = self.name.lstrip("-") # TODO: Make sure this doesn't break downstream
         
         if self.type == "boolean":
             annotation = Optional[bool] if self.optional else bool
