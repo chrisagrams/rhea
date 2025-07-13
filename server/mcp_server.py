@@ -137,7 +137,10 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
     return res
 
 
-@mcp.tool()
+@mcp.tool(
+        name="find_tools",
+        title="Find Tools"
+)
 async def find_tools(query: str, ctx: Context) -> str:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
 
@@ -233,8 +236,9 @@ async def find_tools(query: str, ctx: Context) -> str:
             return wrapper
 
         # Create tool.call()
+        safe_name = tool.name.lower().replace(" ", "_") # Normalize tool name
         fn = make_wrapper(tool.id, [name for name in params])
-        fn.__name__ = tool.name
+        fn.__name__ = safe_name
         fn.__doc__ = tool.description
         fn.__signature__ = sig  # type: ignore[attr-defined]
 
@@ -242,7 +246,7 @@ async def find_tools(query: str, ctx: Context) -> str:
         fn.__annotations__["return"] = MCPOutput
 
         # Add tool to MCP server
-        mcp.add_tool(fn, name=tool.name, description=tool.description)
+        mcp.add_tool(fn, name=safe_name, title=tool.name, description=tool.description)
 
         # Add documentation resource to MCP server
         mcp.add_resource(
