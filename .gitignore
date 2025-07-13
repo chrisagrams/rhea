@@ -13,3 +13,5 @@ runinfo/
 test_files/
 
 .DS_Store/
+
+server/.env
