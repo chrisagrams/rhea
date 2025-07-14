@@ -20,7 +20,7 @@ from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from utils.models import Base
 from utils.schema import Tool, Inputs
-from server.schema import AppContext, MCPOutput, Settings
+from server.schema import AppContext, MCPOutput, MCPTool, Settings
 from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
@@ -124,7 +124,7 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
         name="find_tools",
         title="Find Tools"
 )
-async def find_tools(query: str, ctx: Context) -> str:
+async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
 
     # Clear previous tools (except find_tools)
@@ -145,6 +145,7 @@ async def find_tools(query: str, ctx: Context) -> str:
     )
     retrieved = res["ids"][0]
 
+    result = []
 
     # Populate tools
     for t in retrieved:
@@ -242,9 +243,13 @@ async def find_tools(query: str, ctx: Context) -> str:
             )
         )
 
+        # Add MCPTool to result
+        result.append(MCPTool.from_rhea(tool))
+
     await ctx.request_context.session.send_tool_list_changed() # notifiactions/tools/list_changed
     await ctx.request_context.session.send_resource_list_changed() # notifications/resources/list_changed
-    return f"Populated {len(retrieved)} tools."
+    
+    return result
 
 
 async def main():

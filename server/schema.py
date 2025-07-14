@@ -89,3 +89,17 @@ class MCPOutput(BaseModel):
             stderr=p.stderr,
             files=files
         )
+
+
+class MCPTool(BaseModel):
+    name: str
+    description: str
+    long_description: str
+
+    @classmethod
+    def from_rhea(cls, t: Tool):
+        return cls(
+            name=t.name,
+            description=t.description,
+            long_description=t.long_description or "Long description not available for this tool."
+        )
