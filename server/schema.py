@@ -28,6 +28,8 @@ class AppContext:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8')
 
+    host: str = "localhost"
+    port: int = 3001
     debug_port: int | None = None
     pickle_file: str = "tools_dict.pkl"
     

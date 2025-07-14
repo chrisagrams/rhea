@@ -91,6 +91,5 @@ if __name__ == "__main__":
     # tool = tools["fa1c79f582a17d50"] # Not working (configfile)
     # tool = tools["c8658b82d8429f5d"]
 
-    tool_results = asyncio.run(run_tool_tests(tool))
-
-    parsl.dfk().cleanup()
+    with parsl.load(config) as dfk:
+        tool_results = asyncio.run(run_tool_tests(tool))

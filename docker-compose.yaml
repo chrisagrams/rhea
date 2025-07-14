@@ -1,4 +1,17 @@
 services:
+  server:
+    image: chrisagrams/rhea-server:latest
+    container_name: rhea-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Allow the server to execute Docker agents
+    env_file:
+        - .env.docker
+
   redis:
     image: redis:7
     container_name: rhea-redis

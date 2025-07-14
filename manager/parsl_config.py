@@ -14,12 +14,12 @@ docker_cmd = (
     "-e REDIS_PORT=6379 "
     "-e HTTP_PROXY=http://host.docker.internal:3128 "
     "-e HTTPS_PROXY=http://host.docker.internal:3128 "
-    "rhea-worker:latest "
+    "chrisagrams/rhea-worker-agent:latest "
 )
 
 launch_cmd = (
     "/home/rhea/venv/bin/python -u "
-    "-m debugpy --listen 0.0.0.0:5680 --wait-for-client "  # debugpy
+    # "-m debugpy --listen 0.0.0.0:5680 --wait-for-client "  # debugpy
     "-m parsl.executors.high_throughput.process_worker_pool "
     "{debug} {max_workers_per_node} "
     "-a {addresses} "
@@ -60,5 +60,3 @@ config = Config(
         )
     ]
 )
-
-parsl.load(config)

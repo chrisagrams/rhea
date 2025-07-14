@@ -23,7 +23,8 @@ from utils.models import Base
 from utils.schema import Tool, Inputs
 from server.schema import AppContext, MCPOutput, MCPTool, Settings
 from agent.schema import RheaParam, RheaOutput
-from manager.parsl_config import config
+from manager.parsl_config import config as parsl_config
+from parsl.errors import ConfigurationError
 from manager.launch_agent import launch_agent
 from inspect import Signature, Parameter
 from typing import List, Optional
@@ -49,6 +50,12 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     academy_client: Optional[UserExchangeClient] = None
 
     try:
+        # Prevent double-loading DFK
+        try:
+            parsl.load(parsl_config)
+        except ConfigurationError:
+            pass
+
         chroma_client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
         openai_ef = embedding_functions.OpenAIEmbeddingFunction(
             api_key=settings.vllm_key,
@@ -90,6 +97,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     finally: # Application shutdown
         if academy_client is not None:
             await academy_client.close()
+        parsl.clear()
         parsl.dfk().cleanup()
 
 
@@ -291,7 +299,7 @@ async def serve_sse():
         Route("/sse", endpoint=handle_sse, methods=["GET"]),
         Mount("/messages/", app=sse.handle_post_message),
     ])
-    config = uvicorn.Config(app, host="127.0.0.1", port=3001)
+    config = uvicorn.Config(app, host=settings.host, port=settings.port)
     server = uvicorn.Server(config)
     await server.serve()
 

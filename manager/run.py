@@ -18,59 +18,58 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    with open("tools_dict.pkl", "rb") as f:
-            tools = pickle.load(f)
-    tool = tools["204bd0ff6499fcca"]
-    connector = RedisConnector("localhost", 6379)
+    with parsl.load(config) as dfk:
+        with open("tools_dict.pkl", "rb") as f:
+                tools = pickle.load(f)
+        tool = tools["204bd0ff6499fcca"]
+        connector = RedisConnector("localhost", 6379)
 
-    with Store("rhea-input", connector, register=True) as input_store:
-        with open("test_files/test.csv", "rb") as f:
-            buffer = f.read()
-            proxy = input_store.proxy(buffer)
-            key = get_key(proxy)
+        with Store("rhea-input", connector, register=True) as input_store:
+            with open("test_files/test.csv", "rb") as f:
+                buffer = f.read()
+                proxy = input_store.proxy(buffer)
+                key = get_key(proxy)
 
-            rhea_params = []
-            for param in tool.inputs.params:
-                if param.name == "input1":
-                    rhea_params.append(RheaParam.from_param(param, key))
-                elif param.name == "sep":
-                    rhea_params.append(RheaParam.from_param(param, ","))
-                elif param.name == "header":
-                    rhea_params.append(RheaParam.from_param(param, True))
+                rhea_params = []
+                for param in tool.inputs.params:
+                    if param.name == "input1":
+                        rhea_params.append(RheaParam.from_param(param, key))
+                    elif param.name == "sep":
+                        rhea_params.append(RheaParam.from_param(param, ","))
+                    elif param.name == "header":
+                        rhea_params.append(RheaParam.from_param(param, True))
 
-            # Need to create a client to communicate w/ agent
-            factory = RedisExchangeFactory("localhost", 6379)
-            client = await factory.create_user_client(name="rhea-manager")
+                # Need to create a client to communicate w/ agent
+                factory = RedisExchangeFactory("localhost", 6379)
+                client = await factory.create_user_client(name="rhea-manager")
 
 
-            future_handle = launch_agent(
-                tool,
-                redis_host="host.docker.internal",
-                redis_port=6379,
-                minio_endpoint="host.docker.internal:9000",
-                minio_access_key="admin",
-                minio_secret_key="password",
-                minio_secure=False,
-            )
+                future_handle = launch_agent(
+                    tool,
+                    redis_host="host.docker.internal",
+                    redis_port=6379,
+                    minio_endpoint="host.docker.internal:9000",
+                    minio_access_key="admin",
+                    minio_secret_key="password",
+                    minio_secure=False,
+                )
 
-            unbound_handle: UnboundRemoteHandle = future_handle.result()
+                unbound_handle: UnboundRemoteHandle = future_handle.result()
 
-            handle: RemoteHandle = unbound_handle.bind_to_client(client)
+                handle: RemoteHandle = unbound_handle.bind_to_client(client)
 
-            packages = await ( await handle.get_installed_packages() )
+                packages = await ( await handle.get_installed_packages() )
 
-            tool_result = await ( await handle.run_tool(rhea_params) )
+                tool_result = await ( await handle.run_tool(rhea_params) )
 
-            print(packages)
+                print(packages)
 
-            for result in tool_result.files:
-                with Store("rhea-output", connector, register=True) as output_store:
-                    result = output_store.get(result.key)
-                    print(result)
+                for result in tool_result.files:
+                    with Store("rhea-output", connector, register=True) as output_store:
+                        result = output_store.get(result.key)
+                        print(result)
 
-            await handle.shutdown()
-
-            parsl.dfk().cleanup()
+                await handle.shutdown()
 
 
 if __name__ == "__main__":
