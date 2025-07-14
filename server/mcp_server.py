@@ -20,37 +20,20 @@ from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from utils.models import Base
 from utils.schema import Tool, Inputs
-from server.schema import AppContext, MCPOutput
+from server.schema import AppContext, MCPOutput, Settings
 from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import config
 from manager.launch_agent import launch_agent
 from inspect import Signature, Parameter
 from typing import List, Optional
 from proxystore.connectors.redis import RedisKey
-from dotenv import load_dotenv
 from pydantic.networks import AnyUrl
 
-load_dotenv()
+settings = Settings()
 
-debug_port = os.environ.get("DEBUG_PORT")
-pickle_file = os.environ.get("PICKLE_FILE", "../tools_dict.pkl")
-redis_host = os.environ.get("REDIS_HOST", "localhost")
-redis_port = int(os.environ.get("REDIS_PORT", "6379"))
-vllm_key = os.environ.get("VLLM_KEY", "abc123")
-vllm_url = os.environ.get("VLLM_URL", "http://localhost:8000/v1")
-model = os.environ.get("MODEL", "Qwen/Qwen3-Embedding-0.6B")
-chroma_host = os.environ.get("CHROMA_HOST", "localhost")
-chroma_port = int(os.environ.get("CHROMA_PORT", "8001"))
-chroma_collection = os.environ.get("CHROMA_COLLECTION")
-agent_redis_host = os.environ.get("AGENT_REDIS_HOST", "localhost")
-agent_redis_port = int(os.environ.get("AGENT_REDIS_PORT", "6379"))
-minio_endpoint = os.environ.get("MINIO_ENDPOINT", "localhost")
-minio_access_key = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
-minio_secret_key = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
-
-if debug_port:
-    debugpy.listen(("0.0.0.0", int(debug_port)))
-    print(f"Waiting for VS Code to attach on port {int(debug_port)}")
+if settings.debug_port is not None:
+    debugpy.listen(("0.0.0.0", int(settings.debug_port)))
+    print(f"Waiting for VS Code to attach on port {int(settings.debug_port)}")
     debugpy.wait_for_client()
 
 
@@ -60,18 +43,18 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     academy_client: Optional[UserExchangeClient] = None
 
     try:
-        chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+        chroma_client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
         openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=vllm_key,
-            api_base=vllm_url,
-            model_name=model,
+            api_key=settings.vllm_key,
+            api_base=settings.vllm_url,
+            model_name=settings.model,
         )
 
         ef = cast(EmbeddingFunction[Embeddable], openai_ef)
 
-        if chroma_collection is not None and ef is not None:
+        if settings.chroma_collection is not None and ef is not None:
             collection = chroma_client.get_or_create_collection(
-                name=chroma_collection,
+                name=settings.chroma_collection,
                 embedding_function=ef,
             )
         else:
@@ -79,10 +62,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
                 "CHROMA_COLLECTION must be set (got None); cannot initialize ChromaDB collection"
             ) 
         
-        factory = RedisExchangeFactory(redis_host, redis_port)
+        factory = RedisExchangeFactory(settings.redis_host, settings.redis_port)
         academy_client = await factory.create_user_client(name="rhea-manager")
 
-        with open(pickle_file, "rb") as f:
+        with open(settings.pickle_file, "rb") as f:
             galaxy_tools = pickle.load(f)
 
         yield AppContext(
@@ -204,11 +187,11 @@ async def find_tools(query: str, ctx: Context) -> str:
                 # Launch agent
                 future_handle = launch_agent(
                     tool,
-                    redis_host=agent_redis_host,
-                    redis_port=agent_redis_port,
-                    minio_endpoint=minio_endpoint,
-                    minio_access_key=minio_access_key,
-                    minio_secret_key=minio_secret_key,
+                    redis_host=settings.agent_redis_host,
+                    redis_port=settings.agent_redis_port,
+                    minio_endpoint=settings.minio_endpoint,
+                    minio_access_key=settings.minio_access_key,
+                    minio_secret_key=settings.minio_secret_key,
                     minio_secure=False,
                 )
 

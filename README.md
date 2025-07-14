@@ -27,7 +27,7 @@ uv sync
 ```
 
 ### Configuring Environment
-An example `.env` file is provided in `server/.env.example`.
+An example `.env` file is provided in `.env.example`.
 Datasets coming soon!
 
 ### Installing into Claude Desktop
