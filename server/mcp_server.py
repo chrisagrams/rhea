@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.resources.types import TextResource
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
+from mcp.server.sse import SseServerTransport
 from academy.exchange import UserExchangeClient
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from academy.exchange.redis import RedisExchangeFactory
@@ -28,6 +29,11 @@ from inspect import Signature, Parameter
 from typing import List, Optional
 from proxystore.connectors.redis import RedisKey
 from pydantic.networks import AnyUrl
+from argparse import ArgumentParser
+
+parser = ArgumentParser()
+parser.add_argument("--transport", choices=("stdio", "sse"), default="stdio", help="Transport protocol to run (stdio or sse)")
+args = parser.parse_args()
 
 settings = Settings()
 
@@ -252,13 +258,51 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     return result
 
 
-async def main():
+async def serve_stdio():
     async with stdio_server() as (r, w):
         init_opts = lowlevel_server.create_initialization_options(
             lowlevel_server.notification_options,
             {}
         )
         await lowlevel_server.run(r, w, init_opts)
+
+
+async def serve_sse():
+    import uvicorn
+    from starlette.applications import Starlette
+    from starlette.routing import Route, Mount
+    from starlette.responses import Response
+
+    sse = SseServerTransport("/messages/")
+    
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            await lowlevel_server.run(
+                streams[0], streams[1], 
+                lowlevel_server.create_initialization_options(
+                    lowlevel_server.notification_options
+                )
+            )
+        return Response()
+
+    app = Starlette(routes=[
+        Route("/sse", endpoint=handle_sse, methods=["GET"]),
+        Mount("/messages/", app=sse.handle_post_message),
+    ])
+    config = uvicorn.Config(app, host="127.0.0.1", port=3001)
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
+async def main():
+    match args.transport:
+        case "stdio":
+            await serve_stdio()
+        case "sse":
+            await serve_sse()
+        
 
 if __name__ == "__main__":
     anyio.run(main)
