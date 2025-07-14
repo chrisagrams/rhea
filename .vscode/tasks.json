@@ -13,7 +13,7 @@
         "--platform",
         "linux/amd64,linux/arm64",
         "-t",
-        "chrisagrams/rhea-worker:latest",
+        "chrisagrams/rhea-worker-agent:latest",
         "."
       ],
       "problemMatcher": [],
