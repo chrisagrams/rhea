@@ -86,3 +86,13 @@ And set the following configuration parameters:
 
 
 > **Note:** The timeouts are a temporary workaround to make sure the MCP client does not timeout during long tool executions. Better progress reporting is coming soon.
+
+### Running with SSE Transport
+By default, the MCP server will start with STDIO transport for use with Claude Desktop. To enable SSE transport layer:
+
+```bash
+uv run -m server.mcp_server --transport sse
+```
+
+### Running with Streamable HTTP 
+*Work in progress!*
