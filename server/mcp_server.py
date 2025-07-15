@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.resources.types import TextResource
+from mcp.server.fastmcp.resources.base import Resource
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.server.sse import SseServerTransport
@@ -21,14 +22,15 @@ from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from utils.models import Base
 from utils.schema import Tool, Inputs
-from server.schema import AppContext, MCPOutput, MCPTool, Settings
+from server.schema import AppContext, MCPOutput, MCPDataOutput, MCPTool, Settings
 from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import config as parsl_config
 from parsl.errors import ConfigurationError
 from manager.launch_agent import launch_agent
 from inspect import Signature, Parameter
 from typing import List, Optional
-from proxystore.connectors.redis import RedisKey
+from proxystore.connectors.redis import RedisKey, RedisConnector
+from proxystore.store import Store
 from pydantic.networks import AnyUrl
 from argparse import ArgumentParser
 
@@ -78,6 +80,8 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         factory = RedisExchangeFactory(settings.redis_host, settings.redis_port)
         academy_client = await factory.create_user_client(name="rhea-manager")
 
+        connector = RedisConnector(settings.redis_host, settings.redis_port)
+
         with open(settings.pickle_file, "rb") as f:
             galaxy_tools = pickle.load(f)
 
@@ -87,6 +91,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             openai_ef=openai_ef,
             collection=collection,
             factory=factory,
+            connector=connector,
             academy_client=academy_client,
             galaxy_tools=galaxy_tools,
             agents = {}

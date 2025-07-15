@@ -6,6 +6,7 @@ from chromadb.api.models.Collection import Collection
 from academy.identifier import AgentId
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
+from proxystore.connectors.redis import RedisConnector
 from utils.schema import Tool
 from agent.tool import RheaToolAgent
 from agent.schema import RheaDataOutput, RheaOutput
@@ -20,6 +21,7 @@ class AppContext:
     openai_ef: OpenAIEmbeddingFunction
     collection: Collection
     factory: RedisExchangeFactory
+    connector: RedisConnector
     academy_client: UserExchangeClient
     galaxy_tools: dict[str, Tool]
     agents: dict[str, AgentId[RheaToolAgent]]
