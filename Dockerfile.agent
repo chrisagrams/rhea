@@ -35,14 +35,28 @@ RUN case "$TARGETARCH" in \
   && rm /tmp/miniconda.sh \
   && $MINICONDA_HOME/bin/conda clean -afy 
 
+# Pre‑accept Anaconda channel Terms of Service
+RUN mkdir -p $HOME \
+  && cat <<EOF > $HOME/.condarc
+accepted_terms:
+  https://repo.anaconda.com/pkgs/main: yes
+plugins:
+  auto_accept_tos: true
+EOF
+
 WORKDIR /home/rhea/app
 
 RUN conda install -y -c conda-forge uv \
   && conda clean -afy
 
-RUN conda config --add channels bioconda \
+# Add channels and automatic ToS accept
+RUN conda install -y -c conda-forge uv \
+  && conda clean -afy \
+  && conda config --add channels bioconda \
   && conda config --add channels conda-forge \
-  && conda config --set channel_priority strict
+  && conda config --set channel_priority strict \
+  && conda install -y -n base conda-anaconda-tos \
+  && conda config --set plugins.auto_accept_tos yes
 
 RUN uv venv --python 3.10 /home/rhea/venv \
  && . /home/rhea/venv/bin/activate \
