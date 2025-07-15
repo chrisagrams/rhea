@@ -321,7 +321,7 @@ class RheaToolAgent(Agent):
                 if out.from_work_dir is None or out.from_work_dir == "":
                     env[out.name] = os.path.join(output_dir, out.name)
                 else:
-                    env[out.name] = os.path.join(output_dir, out.from_work_dir)
+                    env[out.name] = os.path.join(env["__tool_directory__"], out.from_work_dir) # Get the file out of the workdir
 
     def build_configfile(self, env: dict[str, str], configfile: ConfigFile) -> str:
         with NamedTemporaryFile('w', delete=False) as tf:
