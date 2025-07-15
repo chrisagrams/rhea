@@ -65,7 +65,8 @@ def sample_tool(tools):
     # tool_id = "e80befe4deb80218"
     # tool_id = "3d6a9a001720230c"
     # tool_id = "e419dee9cfaa2f3f"
-    tool_id = "ec6d2afcc6959e78"
+    # tool_id = "ec6d2afcc6959e78"
+    tool_id = "dba308ddf7976bcd"
  
     return tools.get(tool_id) or next(iter(tools.values()))
 
@@ -166,7 +167,7 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
                 if sample_tool.configfiles.configfiles is not None:
                     for configfile in sample_tool.configfiles.configfiles:
                         agent.build_configfile(env, configfile)
-            cmd = agent.expand_galaxy_if(sample_tool.command, env)
+            cmd = agent.expand_galaxy_if(sample_tool.command.command, env)
             cmd = cmd.replace('\n', ' ')
             cmd = agent.unescape_bash_vars(cmd)
             cmd = agent.fix_var_quotes(cmd)
