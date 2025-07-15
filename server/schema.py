@@ -61,6 +61,7 @@ class MCPDataOutput(BaseModel):
     size: int
     filename: str
     name: Optional[str] = None
+    format: Optional[str] = None
 
     @classmethod
     def from_rhea(cls, p: RheaDataOutput):
@@ -68,7 +69,8 @@ class MCPDataOutput(BaseModel):
             key=p.key.redis_key,
             size=p.size,
             filename=p.filename,
-            name=p.name
+            name=p.name,
+            format=p.format
         )
 
 

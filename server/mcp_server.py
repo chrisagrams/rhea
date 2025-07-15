@@ -108,7 +108,7 @@ mcp = FastMCP("Rhea", lifespan=app_lifespan)
 lowlevel_server: Server = mcp._mcp_server
 lowlevel_server.notification_options.resources_changed = True
 lowlevel_server.notification_options.tools_changed = True
-    
+
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
     res = []

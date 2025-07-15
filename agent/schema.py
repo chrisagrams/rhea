@@ -249,10 +249,11 @@ class RheaDataOutput:
     size: int
     filename: str
     name: Optional[str] = None
+    format: Optional[str] = None
 
     @classmethod
     def from_file(
-        cls, filepath: str, store: Store[RedisConnector], name: Optional[str] = None
+        cls, filepath: str, store: Store[RedisConnector], name: Optional[str] = None, format: Optional[str] = None
     ) -> "RheaDataOutput":
         with open(filepath, "rb") as f:
             buffer = f.read()
@@ -261,7 +262,7 @@ class RheaDataOutput:
 
         size = os.path.getsize(filepath)
         filename = os.path.basename(filepath)
-        return cls(key=key, size=size, filename=filename, name=name) #type: ignore
+        return cls(key=key, size=size, filename=filename, name=name, format=format) #type: ignore
 
 
 class RheaOutput:

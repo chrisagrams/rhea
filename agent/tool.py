@@ -406,7 +406,7 @@ class RheaToolAgent(Agent):
                                 try:
                                     outputs.files.append(
                                         RheaDataOutput.from_file(
-                                            env[out.name], output_store, name=out.name
+                                            env[out.name], output_store, name=out.name, format=out.format
                                         )
                                     )
                                 except Exception:
@@ -414,7 +414,7 @@ class RheaToolAgent(Agent):
                             else:
                                 outputs.files.append(
                                     RheaDataOutput.from_file(
-                                        env[out.name], output_store, name=out.name
+                                        env[out.name], output_store, name=out.name, format=out.format
                                     )
                                 )
 
