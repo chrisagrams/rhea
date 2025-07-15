@@ -595,6 +595,11 @@ class Tests(BaseModel):
     tests: List[Test]
 
 
+class Command(BaseModel):
+    command: str
+    interpreter: str | None = None
+
+
 class Tool(BaseModel):
     id: str
     name: str
@@ -607,7 +612,7 @@ class Tool(BaseModel):
     requirements: Requirements
     stdio: Stdio
     version_command: str
-    command: str
+    command: Command
     configfiles: Optional[ConfigFiles] = None
     inputs: Inputs
     outputs: Outputs
@@ -712,11 +717,14 @@ class Tool(BaseModel):
             version_command = ""
 
         # Command
+        
         cmd_el = root.find("command")
         if cmd_el is not None:
-            command = cmd_el.text or ""
+            command_string = cmd_el.text or ""
+            interpreter = cmd_el.get("interpreter") or None
+            command = Command(command=command_string, interpreter=interpreter)
         else:
-            command = ""
+            command = Command(command="", interpreter=None)
 
         # Configfiles
         config_files = None

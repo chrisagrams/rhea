@@ -1,7 +1,9 @@
 # Rhea
 A RAG+MCP tool server for Galaxy Toolshed.
 
-An example execution with Claude: https://claude.ai/share/ce922736-ab3a-4e1a-8901-8ca26cfb59cb
+Example executions with Claude:
+- https://claude.ai/share/37e6cf45-7139-405c-9280-61a469edf81f
+- https://claude.ai/share/ce922736-ab3a-4e1a-8901-8ca26cfb59cb
 
 
 ## How it works? 

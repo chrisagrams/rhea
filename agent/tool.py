@@ -156,9 +156,17 @@ class RheaToolAgent(Agent):
             default = m.group(1)
             return str(value) if value is not None else default
 
-        self.tool.command = pattern.sub(_repl, self.tool.command)
+        self.tool.command.command = pattern.sub(_repl, self.tool.command.command)
 
     
+    def apply_interpreter_command(self) -> str:
+        """
+        Command might have an "interpreter" section, append it before the command. (e.g. python)
+        """
+        if self.tool.command.interpreter is not None and self.tool.command.interpreter != "":
+            return f"{self.tool.command.interpreter} {self.tool.command.command}"
+        return self.tool.command.command
+
 
     def expand_galaxy_if(self, cmd: str, env: dict[str, str]) -> str:
         var_pattern = re.compile(r'\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?')
@@ -346,7 +354,8 @@ class RheaToolAgent(Agent):
                         self.build_configfile(env, configfile)
                 
                 # Configure command script
-                cmd = self.expand_galaxy_if(self.tool.command, env)
+                cmd = self.apply_interpreter_command()
+                cmd = self.expand_galaxy_if(cmd, env)
                 cmd = cmd.replace('\n', ' ')
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
@@ -375,7 +384,7 @@ class RheaToolAgent(Agent):
                     script_path,
                 ]
                 result = subprocess.run(
-                    cmd, env=env, cwd=cwd, capture_output=True, text=True
+                    cmd, env=env, cwd=env["__tool_directory__"], capture_output=True, text=True
                 )
                 if result.returncode != 0:
                     raise Exception(f"Error in running tool command: {result.stderr}")
