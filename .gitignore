@@ -16,3 +16,5 @@ test_files/
 
 .env
 .env.docker
+
+data/
