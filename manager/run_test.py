@@ -4,7 +4,7 @@ from academy.logging import init_logging
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from utils.schema import Tool, Param, Tests, Test, Conditional
 from utils.process import process_inputs, process_outputs
-from manager.parsl_config import config
+from manager.parsl_config import generate_parsl_config
 from manager.launch_agent import launch_agent
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
@@ -94,5 +94,11 @@ if __name__ == "__main__":
 
     # tool = tools["e1d52e9221388701"]
 
-    with parsl.load(config) as dfk:
+    with parsl.load(
+        generate_parsl_config(
+            backend="docker",
+            network="local",
+            debug=False
+        )
+    ) as dfk:
         tool_results = asyncio.run(run_tool_tests(tool))

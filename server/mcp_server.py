@@ -24,7 +24,7 @@ from utils.models import Base
 from utils.schema import Tool, Inputs
 from server.schema import AppContext, MCPOutput, MCPDataOutput, MCPTool, Settings
 from agent.schema import RheaParam, RheaOutput
-from manager.parsl_config import config as parsl_config
+from manager.parsl_config import generate_parsl_config
 from parsl.errors import ConfigurationError
 from manager.launch_agent import launch_agent
 from inspect import Signature, Parameter
@@ -54,7 +54,13 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     try:
         # Prevent double-loading DFK
         try:
-            parsl.load(parsl_config)
+            parsl.load(
+                generate_parsl_config(
+                    backend=settings.parsl_container_backend,
+                    network=settings.parsl_container_network,
+                    debug=settings.parsl_container_debug
+                )
+            )
         except ConfigurationError:
             pass
 

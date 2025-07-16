@@ -4,7 +4,7 @@ from academy.logging import init_logging
 from academy.exchange.redis import RedisExchangeFactory
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from agent.schema import RheaParam
-from manager.parsl_config import config
+from manager.parsl_config import generate_parsl_config
 from manager.launch_agent import launch_agent
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
@@ -18,7 +18,13 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    with parsl.load(config) as dfk:
+    with parsl.load(
+        generate_parsl_config(
+            backend="docker",
+            network="local",
+            debug=False
+        )
+    ) as dfk:
         with open("tools_dict.pkl", "rb") as f:
                 tools = pickle.load(f)
         tool = tools["204bd0ff6499fcca"]

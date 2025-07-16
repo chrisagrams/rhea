@@ -12,7 +12,7 @@ from agent.tool import RheaToolAgent
 from agent.schema import RheaDataOutput, RheaOutput
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 @dataclass
 class AppContext:
@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     port: int = 3001
     debug_port: int | None = None
     pickle_file: str = "tools_dict.pkl"
+
+    # Parsl configuration
+    parsl_container_backend: Literal["docker", "podman"] = "docker"
+    parsl_container_network: Literal["host", "local"] = "host"
+    parsl_container_debug: bool = False
     
     redis_host: str = "localhost"
     redis_port: int = 6379
