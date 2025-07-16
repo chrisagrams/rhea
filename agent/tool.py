@@ -168,22 +168,29 @@ class RheaToolAgent(Agent):
         return self.tool.command.command
 
 
-    def expand_galaxy_if(self, cmd: str, env: dict[str, str]) -> str:
+    def expand_galaxy_if(self, cmd: str, env: dict[str, Any]) -> str:
         var_pattern = re.compile(r'\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?')
         vars_ = sorted(set(var_pattern.findall(cmd)),
                     key=lambda v: v.count('.'),
                     reverse=True)
         nested_roots = {v.split('.')[0] for v in vars_ if '.' in v}
 
-        context: dict[str, GalaxyVar] = {}
+        context: dict[str, Any] = {}
         for k, v in env.items():
             if '.' not in k:
-                context[k] = GalaxyVar(v)
+                if isinstance(v, (list, GalaxyFileVar)):
+                    context[k] = v
+                else:
+                    context[k] = GalaxyVar(v)
 
         for k, v in env.items():
             if '.' in k:
                 root, rest = k.split('.', 1)
-                context.setdefault(root, GalaxyVar('')).set_nested(rest, v)
+                if root not in context:
+                    context[root] = GalaxyVar('')
+                
+                if isinstance(context[root], GalaxyVar):
+                    context[root].set_nested(rest, v)
 
         for var in vars_:
             parts = var.split('.')
@@ -192,11 +199,23 @@ class RheaToolAgent(Agent):
                 if root not in nested_roots and root not in context:
                     context[root] = GalaxyVar('')
             else:
-                root, nested = parts[0], parts[1]
-                context.setdefault(root, GalaxyVar('')).set_nested(nested, '')
-
-        cmd = re.sub(r'\.get\([^)]*\)', '', cmd)
-        cmd = re.sub(r'\.strip\([^)]*\)', '', cmd)
+                # Handle multi-level nesting
+                root = parts[0]
+                if root not in context:
+                    context[root] = GalaxyVar('')
+                
+                # Build the nested structure level by level
+                current = context[root]
+                for i in range(1, len(parts)):
+                    nested_key = parts[i]
+                    if isinstance(current, GalaxyVar):
+                        if nested_key not in current._nested:
+                            # If this is the last part, set empty string, otherwise create new GalaxyVar
+                            if i == len(parts) - 1:
+                                current.set_nested(nested_key, '')
+                            else:
+                                current.set_nested(nested_key, GalaxyVar(''))
+                        current = current._nested[nested_key]
 
         tmpl = Template(source=cmd, searchList=[context])
         return tmpl.respond()
@@ -248,13 +267,13 @@ class RheaToolAgent(Agent):
         
 
     def build_env_parameters(
-            self,
-            env: dict[str, str],
-            params: List[RheaParam],
-            tool_params: List[Param],
-            input_dir: str,
-            input_store: Store
-        ) -> None:
+        self,
+        env: dict[str, Any],
+        params: List[RheaParam],
+        tool_params: List[Param],
+        input_dir: str,
+        input_store: Store
+    ) -> None:
         # Configure parameters
         env["__tool_directory__"] = self.configure_tool_directory()
 
@@ -268,22 +287,18 @@ class RheaToolAgent(Agent):
                     else:
                         raise KeyError(
                             f"No file associated with key {param.value}"
-                        )                
-                if param.name in env: # If the param is already populated, its most likely a list of files
-                    #TODO: Fix type errors (this should be safe)
-                    prev = env[param.name]
-                    if isinstance(env[param.name], List):
-                        env[param.name].append(tmp_file_path) #type: ignore
-                    else:
-                        env[param.name] = [] #type: ignore
-                        env[param.name].append(prev) #type: ignore
-                else:
-                    env[param.name] = tmp_file_path
+                        )
                 
-                if param.filename is not None:
-                    extension = param.filename.split(".")[-1]
-                    env[f"{param.name}.ext"] = extension
-                        
+                file_var = GalaxyFileVar(tmp_file_path, param.filename)
+                
+                if param.name in env:
+                    if isinstance(env[param.name], list):
+                        env[param.name].append(file_var)
+                    else:
+                        env[param.name] = [env[param.name], file_var]
+                else:
+                    env[param.name] = file_var
+                    
             elif isinstance(param, RheaBooleanParam):
                 if param.checked or param.value:
                     value = param.truevalue
@@ -302,7 +317,7 @@ class RheaToolAgent(Agent):
                 values = []
                 for p in param.values:
                     values.append(p.value)
-                env[param.name] = values # TODO: Fix type errors here (it must be a List!) #type: ignore
+                env[param.name] = values
         
         # For params that were not provided (optional ones), put their default value
         for param in tool_params:
@@ -310,7 +325,8 @@ class RheaToolAgent(Agent):
                 if param.name not in env and param.name is not None:
                     if param.value is not None:
                         env[param.name] = param.value
-        
+            
+
     def build_output_env_parameters(
             self,
             env: dict[str, str],

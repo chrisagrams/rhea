@@ -47,27 +47,27 @@ def sample_tool(tools):
     # tool_id = "783bde422b425bd9"
     # tool_id = "a74ca2106a7a2073"
     # tool_id = "adf651eab94cc80c"
-    # tool_id = "8423143bf85371a0"
+    # tool_id = "8423143bf85371a0" # Bug
     # tool_id = "8e36777d470b3c19"
     # tool_id = "fa1c79f582a17d50"
     # tool_id = "790743498728befc"
-    # tool_id = "9c80f36219a53991"
+    # tool_id = "9c80f36219a53991" # Bug
 
     # tool_id = "82ab1904790830ef"
     # tool_id = "46188e84a762dfdb"
-    # tool_id = "db44833d587592d4"
+    # tool_id = "db44833d587592d4" # Bug
     # tool_id = "693ed3fbdee03329"
     # tool_id = "c8658b82d8429f5d"
-    # tool_id = "de07f280bfbbbd77"
-    # tool_id = "d32aec850d519e76"
+    # tool_id = "de07f280bfbbbd77" # Bug
+    # tool_id = "d32aec850d519e76" # Bug
     # tool_id = "146d94f3f5a366b3"
     # tool_id = "038c16bdafb1198d"
     # tool_id = "e80befe4deb80218"
     # tool_id = "3d6a9a001720230c"
-    # tool_id = "e419dee9cfaa2f3f"
+    # tool_id = "e419dee9cfaa2f3f" # Bug
     # tool_id = "ec6d2afcc6959e78"
-    tool_id = "dba308ddf7976bcd"
- 
+    # tool_id = "dba308ddf7976bcd"
+    tool_id = "b24d624f2c53f698"
     return tools.get(tool_id) or next(iter(tools.values()))
 
 
@@ -167,7 +167,8 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
                 if sample_tool.configfiles.configfiles is not None:
                     for configfile in sample_tool.configfiles.configfiles:
                         agent.build_configfile(env, configfile)
-            cmd = agent.expand_galaxy_if(sample_tool.command.command, env)
+            cmd = agent.apply_interpreter_command()
+            cmd = agent.expand_galaxy_if(cmd, env)
             cmd = cmd.replace('\n', ' ')
             cmd = agent.unescape_bash_vars(cmd)
             cmd = agent.fix_var_quotes(cmd)

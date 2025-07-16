@@ -72,6 +72,10 @@ def populate_regular_and_conditional(
         ip_cp.name= cp.name
         result.append(get_test_file_from_store(ip_cp, cp, fc))
     else:
+        if input_param is not None:
+            # Edge case when test_param doesn't specify type
+            if test_param.type is None and input_param.type is not None:
+                test_param.type = input_param.type
         result.append(RheaParam.from_param(test_param, value))
         cp = test_param.model_copy()
         cp.name = f"{parent}.{test_param.name}"

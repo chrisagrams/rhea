@@ -3,29 +3,91 @@ import re
 import glob
 from typing import Any, List, Optional
 from dataclasses import dataclass
+from pathlib import Path
 from utils.schema import Param, CollectionOutput
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
 
 
-class GalaxyVar(str):
-    def __new__(cls, value):
-        obj = super().__new__(cls, value)
-        obj._nested = {} #type: ignore
-        return obj
+class GalaxyFileVar:
+    def __init__(self, path: str, filename: Optional[str] = None):
+        self.path = path
+        self.filename = filename
+        self._value = path
 
+    def __str__(self):
+        return self.path
+
+    @property
+    def ext(self):
+        """Get file extension"""
+        if self.filename:
+            return self.filename.split('.')[-1]
+        return os.path.splitext(self.path)[1].lstrip('.')
+
+    def is_of_type(self, file_type: str) -> bool:
+        """Check if file is of given type"""
+        ext = self.ext.lower()
+        
+        type_mappings = {
+            'fasta': ['fa', 'fasta', 'fna', 'ffn', 'faa', 'frn'],
+            'fastq': ['fq', 'fastq'],
+            'sam': ['sam'],
+            'bam': ['bam'],
+            'vcf': ['vcf'],
+            'gff': ['gff', 'gff3'],
+            'bed': ['bed'],
+        }
+        
+        if file_type.lower() in type_mappings:
+            return ext in type_mappings[file_type.lower()]
+        
+        return ext == file_type.lower()
+
+
+class GalaxyVar:
+    def __init__(self, value):
+        self._value = value
+        self._nested = {}
+    
+    def __str__(self):
+        if self._value is None:
+            return ''
+        return str(self._value)
+    
+    def set_nested(self, key: str, value):
+        self._nested[key] = value
+    
     def __getattr__(self, name):
-        try:
+        if name in self._nested:
             return self._nested[name]
-        except KeyError:
-            raise AttributeError(f"{name!r}")
-
+        if hasattr(self._value, name):
+            attr = getattr(self._value, name)
+            if callable(attr):
+                return attr
+            return attr
+        return ''
+    
+    def __iter__(self):
+        return iter(self._value)
+    
+    def __len__(self):
+        return len(self._value)
+    
     def __getitem__(self, key):
-        return getattr(self, key)
-
-    def set_nested(self, name, value):
-        self._nested[name] = value
+        return self._value[key]
+    
+    def __contains__(self, item):
+        return item in self._value
+    
+    def __bool__(self):
+        return bool(self._value)
+    
+    def __eq__(self, other):
+        if isinstance(other, GalaxyVar):
+            return self._value == other._value
+        return self._value == other
 
 
 class RheaParam:
