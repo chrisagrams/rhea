@@ -22,7 +22,7 @@ from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from utils.models import Base
 from utils.schema import Tool, Inputs
-from server.schema import AppContext, MCPOutput, MCPDataOutput, MCPTool, Settings
+from server.schema import AppContext, MCPOutput, MCPDataOutput, MCPTool, Settings, PBSSettings
 from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import generate_parsl_config
 from parsl.errors import ConfigurationError
@@ -32,13 +32,24 @@ from typing import List, Optional
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from pydantic.networks import AnyUrl
+from pydantic import ValidationError
 from argparse import ArgumentParser
+from pathlib import Path
+
 
 parser = ArgumentParser()
 parser.add_argument("--transport", choices=("stdio", "sse"), default="stdio", help="Transport protocol to run (stdio or sse)")
 args = parser.parse_args()
 
 settings = Settings()
+
+pbs_settings = None
+if Path('.env_pbs').exists():
+    try:
+        pbs_settings = PBSSettings() # type: ignore
+    except ValidationError:
+        pbs_settings = None
+
 
 if settings.debug_port is not None:
     debugpy.listen(("0.0.0.0", int(settings.debug_port)))
@@ -58,7 +69,15 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
                 generate_parsl_config(
                     backend=settings.parsl_container_backend,
                     network=settings.parsl_container_network,
-                    debug=settings.parsl_container_debug
+                    provider=settings.parsl_provider,
+                    max_workers_per_node=settings.parsl_max_workers_per_node,
+                    init_blocks=settings.parsl_init_blocks,
+                    min_blocks=settings.parsl_min_blocks,
+                    max_blocks=settings.parsl_max_blocks,
+                    nodes_per_block=settings.parsl_nodes_per_block,
+                    parallelism=settings.parsl_parallelism,
+                    debug=settings.parsl_container_debug,
+                    pbs_settings=pbs_settings
                 )
             )
         except ConfigurationError:

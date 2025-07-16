@@ -1,8 +1,9 @@
-from typing import Literal
+from typing import Literal, Optional
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
-from parsl.providers import LocalProvider
+from parsl.providers import LocalProvider, PBSProProvider
 from parsl.launchers import WrappedLauncher
+from server.schema import PBSSettings
 
 docker_cmd = (
     "docker run --rm "
@@ -24,7 +25,15 @@ podman_cmd = (
 def generate_parsl_config(
         backend: Literal["docker", "podman"] = "docker", 
         network: Literal["host", "local"] = "host",
-        debug: bool = False
+        provider: Literal["local", "pbs"] = "local",
+        max_workers_per_node: int = 1,
+        init_blocks: int = 0,
+        min_blocks: int = 0,
+        max_blocks: int = 5,
+        nodes_per_block: int = 1,
+        parallelism: int = 1,
+        debug: bool = False,
+        pbs_settings: Optional[PBSSettings] = None
     ) -> Config:
     """
     Generate Parsl config for Docker executor
@@ -75,19 +84,39 @@ def generate_parsl_config(
         "--mpi-launcher={mpi_launcher} "
         "--available-accelerators {accelerators}"
     )
+
+    if provider == "local":
+        parsl_provider = LocalProvider(
+            launcher=WrappedLauncher(prepend=prepend), # type: ignore
+            init_blocks=init_blocks,
+            min_blocks=min_blocks,
+            max_blocks=max_blocks,
+            nodes_per_block=nodes_per_block,
+            parallelism=parallelism,
+        )
+    elif provider == "pbs":
+        if pbs_settings is None:
+            raise ValueError("PBSSettings cannot be none when provider = 'pbs'")
+        parsl_provider = PBSProProvider(
+            launcher=WrappedLauncher(prepend=prepend), # type: ignore
+            account=pbs_settings.account,
+            queue=pbs_settings.queue,
+            walltime=pbs_settings.walltime,
+            scheduler_options=pbs_settings.scheduler_options,
+            select_options=pbs_settings.select_options,
+            init_blocks=init_blocks,
+            min_blocks=min_blocks,
+            max_blocks=max_blocks,
+            nodes_per_block=nodes_per_block,
+            parallelism=parallelism,
+        )
     
     return Config(
         executors=[
             HighThroughputExecutor(
                 label="docker_workers",
-                provider=LocalProvider(
-                    launcher=WrappedLauncher(prepend=prepend), # type: ignore
-                    init_blocks=0,
-                    min_blocks=0,
-                    max_blocks=5,
-                    nodes_per_block=1,
-                    parallelism=1,
-                ),
+                max_workers_per_node=max_workers_per_node,
+                provider=parsl_provider,
                 worker_debug=debug,
                 launch_cmd=launch_cmd_template,
                 worker_logdir_root="./",

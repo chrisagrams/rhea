@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     parsl_container_backend: Literal["docker", "podman"] = "docker"
     parsl_container_network: Literal["host", "local"] = "host"
     parsl_container_debug: bool = False
+    parsl_max_workers_per_node: int = 1
+    parsl_provider: Literal["local", "pbs"] = "local"
+    parsl_init_blocks: int = 0
+    parsl_min_blocks: int = 0
+    parsl_max_blocks: int = 5
+    parsl_nodes_per_block: int = 1
+    parsl_parallelism: int = 1
     
     redis_host: str = "localhost"
     redis_port: int = 6379
@@ -61,6 +68,15 @@ class Settings(BaseSettings):
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
 
+
+class PBSSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file='.env_pbs', env_file_encoding='utf-8')
+
+    account: str 
+    queue: str
+    walltime: str
+    scheduler_options: str
+    select_options: str
 
 
 class MCPDataOutput(BaseModel):
