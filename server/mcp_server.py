@@ -77,7 +77,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
                     nodes_per_block=settings.parsl_nodes_per_block,
                     parallelism=settings.parsl_parallelism,
                     debug=settings.parsl_container_debug,
-                    pbs_settings=pbs_settings
+                    pbs_settings=pbs_settings,
                 )
             )
         except ConfigurationError:

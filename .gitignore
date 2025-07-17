@@ -16,5 +16,6 @@ test_files/
 
 .env
 .env.docker
+.env_pbs
 
 data/

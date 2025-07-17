@@ -9,6 +9,7 @@ runinfo/*
 test_files/
 .env
 .env.docker
+.env_pbs
 docker-compose.yaml
 Dockerfile
 Dockerfile.agent

@@ -109,12 +109,13 @@ def generate_parsl_config(
             max_blocks=max_blocks,
             nodes_per_block=nodes_per_block,
             parallelism=parallelism,
+            worker_init=pbs_settings.worker_init,
         )
     
     return Config(
         executors=[
             HighThroughputExecutor(
-                label="docker_workers",
+                label="rhea-workers",
                 max_workers_per_node=max_workers_per_node,
                 provider=parsl_provider,
                 worker_debug=debug,

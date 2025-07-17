@@ -77,6 +77,7 @@ class PBSSettings(BaseSettings):
     walltime: str
     scheduler_options: str
     select_options: str
+    worker_init: str = '' # Commands to run before workers launched
 
 
 class MCPDataOutput(BaseModel):
