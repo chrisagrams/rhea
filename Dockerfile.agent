@@ -21,8 +21,6 @@ RUN useradd -m -s /bin/bash rhea
 RUN mkdir -p /home/rhea/app
 RUN chown -R rhea:rhea /home/rhea/app
 
-USER rhea
-
 RUN case "$TARGETARCH" in \
     amd64)   CONDA_ARCH=Linux-x86_64   ;; \
     arm64)   CONDA_ARCH=Linux-aarch64   ;; \
