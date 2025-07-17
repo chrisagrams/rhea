@@ -15,6 +15,10 @@ docker_cmd = (
 
 podman_cmd = (
     "podman run --rm "
+    "-e HTTP_PROXY " 
+    "-e HTTPS_PROXY "
+    "-e http_proxy "
+    "-e https_proxy "
     "{debug_port} "
     "--user root "
     "--platform linux/amd64 "  # Ensure amd64 platform is used
