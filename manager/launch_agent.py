@@ -1,7 +1,7 @@
 from parsl import python_app
 from utils.schema import Tool
 
-@python_app(executors=["docker_workers"])
+@python_app(executors=["rhea-workers"])
 def launch_agent(
     tool: Tool,
     redis_host: str,
