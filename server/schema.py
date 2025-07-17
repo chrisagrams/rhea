@@ -78,6 +78,7 @@ class PBSSettings(BaseSettings):
     scheduler_options: str
     select_options: str
     worker_init: str = '' # Commands to run before workers launched
+    cpus_per_node: int = 1 # Hardware threads per node
 
 
 class MCPDataOutput(BaseModel):

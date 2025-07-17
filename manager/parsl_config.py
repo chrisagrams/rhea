@@ -108,6 +108,7 @@ def generate_parsl_config(
             min_blocks=min_blocks,
             max_blocks=max_blocks,
             nodes_per_block=nodes_per_block,
+            cpus_per_node=pbs_settings.cpus_per_node,
             parallelism=parallelism,
             worker_init=pbs_settings.worker_init,
         )
