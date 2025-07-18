@@ -384,9 +384,13 @@ class RheaToolAgent(Agent):
                     tf.write(cmd + "\n")
                     os.chmod(script_path, 0o755)
 
-                # Remove any lists from environment
+                # Remove any objects from environment
                 for k, v in env.items():
                     if isinstance(v, list):
+                        env[k] = str(v)
+                    elif isinstance(v, GalaxyVar):
+                        env[k] = str(v)
+                    elif isinstance(v, GalaxyFileVar):
                         env[k] = str(v)
                 
                 # Run tool
