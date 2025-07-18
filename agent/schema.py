@@ -96,6 +96,12 @@ class RheaParam:
         self.type = type
         self.argument = argument
 
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        return f"RheaParam(name={self.name!r}, type={self.type!r}{arg})"
+    
+    __repr__ = __str__
+
     @classmethod
     def from_param(cls, param: Param, value: Any) -> "RheaParam":
         if param.name is None and param.argument is not None:
@@ -172,6 +178,16 @@ class RheaFileParam(RheaParam):
         self.value = value
         self.filename = filename
 
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        fname = f", filename={self.filename!r}" if self.filename is not None else ""
+        return (
+            f"RheaFileParam(name={self.name!r}, type={self.type!r}{arg}, "
+            f"format={self.format!r}, value={self.value!r}{fname})"
+        )
+
+    __repr__ = __str__
+
     @classmethod
     def from_param(cls, param: Param, value: RedisKey) -> "RheaFileParam":
         if param.name is None or param.type is None or param.format is None:
@@ -195,6 +211,18 @@ class RheaBooleanParam(RheaParam):
         self.falsevalue = falsevalue
         self.value = value
         self.checked = checked
+    
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        val = f", value={self.value!r}" if self.value is not None else ""
+        chk = f", checked={self.checked!r}" if self.checked is not None else ""
+        return (
+            f"RheaBooleanParam(name={self.name!r}, type={self.type!r}"
+            f"{arg}, truevalue={self.truevalue!r}, falsevalue={self.falsevalue!r}"
+            f"{val}{chk})"
+        )
+
+    __repr__ = __str__
 
     @classmethod
     def from_param(cls, param: Param, value: bool) -> "RheaBooleanParam":
@@ -222,6 +250,12 @@ class RheaTextParam(RheaParam):
     ) -> None:
         super().__init__(name, type, argument)
         self.value = value
+    
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        return f"RheaTextParam(name={self.name!r}, type={self.type!r}{arg}, value={self.value!r})"
+
+    __repr__ = __str__
 
     @classmethod
     def from_param(cls, param: Param, value: str) -> "RheaTextParam":
@@ -241,6 +275,17 @@ class RheaIntegerParam(RheaParam):
         self.min = min
         self.max = max
     
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        min_str = f", min={self.min!r}" if self.min is not None else ""
+        max_str = f", max={self.max!r}" if self.max is not None else ""
+        return (
+            f"RheaIntegerParam(name={self.name!r}, type={self.type!r}"
+            f"{arg}, value={self.value!r}{min_str}{max_str})"
+        )
+
+    __repr__ = __str__
+    
     @classmethod
     def from_param(cls, param: Param, value: int, min: int | None = None, max: int | None = None) -> "RheaIntegerParam":
         if param.name is None or param.type is None:
@@ -256,6 +301,17 @@ class RheaFloatParam(RheaParam):
         self.value = value
         self.min = min
         self.max = max
+    
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        min_str = f", min={self.min!r}" if self.min is not None else ""
+        max_str = f", max={self.max!r}" if self.max is not None else ""
+        return (
+            f"RheaFloatParam(name={self.name!r}, type={self.type!r}"
+            f"{arg}, value={self.value!r}{min_str}{max_str})"
+        )
+
+    __repr__ = __str__
 
     @classmethod 
     def from_param(cls, param: Param, value: float, min: float | None = None, max: float | None = None) -> "RheaFloatParam":
@@ -270,6 +326,12 @@ class RheaSelectParam(RheaParam):
     ) -> None:
         super().__init__(name, type, argument)
         self.value = value
+
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        return f"RheaSelectParam(name={self.name!r}, type={self.type!r}{arg}, value={self.value!r})"
+
+    __repr__ = __str__
 
     @classmethod
     def from_param(cls, param: Param, value: str) -> "RheaSelectParam":
@@ -294,6 +356,13 @@ class RheaMultiSelectParam(RheaParam):
     ) -> None:
         super().__init__(name, type, argument)
         self.values = values
+
+    def __str__(self) -> str:
+        arg = f", argument={self.argument!r}" if self.argument is not None else ""
+        vals = "[" + ", ".join(repr(v) for v in self.values) + "]"
+        return f"RheaMultiSelectParam(name={self.name!r}, type={self.type!r}{arg}, values={vals})"
+
+    __repr__ = __str__
     
     @classmethod
     def from_param(cls, param: Param, value: List[str]) -> "RheaMultiSelectParam":
@@ -312,6 +381,16 @@ class RheaDataOutput:
     filename: str
     name: Optional[str] = None
     format: Optional[str] = None
+
+    def __str__(self) -> str:
+        name_part = f", name={self.name!r}" if self.name is not None else ""
+        fmt_part = f", format={self.format!r}" if self.format is not None else ""
+        return (
+            f"RheaDataOutput(key={self.key!r}, size={self.size}, "
+            f"filename={self.filename!r}{name_part}{fmt_part})"
+        )
+
+    __repr__ = __str__
 
     @classmethod
     def from_file(
@@ -338,6 +417,15 @@ class RheaOutput:
     stderr: str
     files: Optional[List[RheaDataOutput]] = None
 
+    def __str__(self) -> str:
+        files_part = f", files={self.files!r}" if self.files is not None else ""
+        return (
+            f"RheaOutput(return_code={self.return_code}, "
+            f"stdout={self.stdout!r}, stderr={self.stderr!r}{files_part})"
+        )
+
+    __repr__ = __str__
+
 
 class RheaCollectionOuput(RheaOutput):
     def __init__(
@@ -349,6 +437,17 @@ class RheaCollectionOuput(RheaOutput):
     ) -> None:
         super().__init__(return_code, stdout, stderr)
         self.collections = collections
+
+    def __str__(self) -> str:
+        files_part = f", files={self.files!r}" if getattr(self, "files", None) is not None else ""
+        collections_repr = "[" + ", ".join(repr(c) for c in self.collections) + "]"
+        return (
+            f"RheaCollectionOuput(return_code={self.return_code}, "
+            f"stdout={self.stdout!r}, stderr={self.stderr!r}"
+            f"{files_part}, collections={collections_repr})"
+        )
+
+    __repr__ = __str__
 
     def resolve(self, output_dir: str, store: Store[RedisConnector]) -> None:
         for collection in self.collections:

@@ -3,6 +3,7 @@ import subprocess
 import json
 import re
 from academy.agent import Agent, action
+from academy.logging import init_logging
 from typing import List, Optional
 from utils.schema import Tool, Param, ConfigFile
 from agent.schema import *
@@ -44,6 +45,7 @@ class RheaToolAgent(Agent):
             secret_key=minio_secret_key,
             secure=minio_secure,
         )
+        self.logger = init_logging()
 
     async def agent_on_startup(self) -> None:
         # Create Conda environment and install Conda packages 
@@ -56,17 +58,18 @@ class RheaToolAgent(Agent):
                 raise NotImplementedError(
                     f'Requirement type of "{requirement.type}" not yet implemented.'
                 )
+        self.logger.info(f"Installing Conda packages: {packages}")
         try:
             cmd = ["conda", "create", "-n", self.tool.id, "-y"] + packages
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                raise Exception(f"Error installing Conda packages: {result.stdout}")
+                raise Exception(f"Error installing Conda packages:\n {result.stdout}")
         except Exception as e:
-            print(e)
+            self.logger.error(f"First attempt to install Conda packages: {e}")
             # Best-effort try installing the latest available package if our first attempt failed.
-            print("Best-effort installing packages...")
             packages = [p.replace("=", ">=") for p in packages]
             cmd = ["conda", "create", "-n", self.tool.id, "-y"] + packages
+            self.logger.info(f"Best-effort installing Conda packages: {packages}")
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Error installing Conda packages: {result.stdout}")
@@ -78,9 +81,11 @@ class RheaToolAgent(Agent):
             raise Exception(f"Error listing Conda packages: {result.stdout}")
         pkg_info = json.loads(result.stdout)
         self.installed_packages = [f"{p['name']}={p['version']}" for p in pkg_info]
+        self.logger.info(f"Successfully installed packaged into Conda environment {self.tool.id}: {self.installed_packages}")
 
     async def agent_on_shutdown(self) -> None:
         # Delete Conda environment
+        self.logger.info(f"Deleting Conda environment {self.tool.id}")
         cmd = ["conda", "env", "remove", "-n", self.tool.id]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -350,6 +355,7 @@ class RheaToolAgent(Agent):
 
     @action
     async def run_tool(self, params: List[RheaParam]) -> RheaOutput:
+        self.logger.info(f"Running tool with params: {params}")
         env = os.environ.copy()
         with (
             Store("rhea-input", self.connector, register=True) as input_store,
@@ -403,6 +409,7 @@ class RheaToolAgent(Agent):
                     "bash",
                     script_path,
                 ]
+                self.logger.info(f"Running subprocess: {cmd}")
                 result = subprocess.run(
                     cmd, env=env, cwd=env["__tool_directory__"], capture_output=True, text=True
                 )
@@ -448,5 +455,6 @@ class RheaToolAgent(Agent):
                     if outputs.files is None:
                         outputs.files = []
                         outputs.resolve(output, output_store)
-
+                
+                self.logger.info(f"Finished tool execution with results: {outputs}")
                 return outputs
