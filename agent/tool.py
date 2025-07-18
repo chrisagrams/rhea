@@ -414,6 +414,7 @@ class RheaToolAgent(Agent):
                     cmd, env=env, cwd=env["__tool_directory__"], capture_output=True, text=True
                 )
                 if result.returncode != 0:
+                    self.logger.error(f"Error in running tool command: \n{result.stdout}\n{result.stderr}")
                     raise Exception(f"Error in running tool command: {result.stderr}")
 
                 # Get outputs
