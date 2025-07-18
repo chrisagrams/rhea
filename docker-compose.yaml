@@ -19,7 +19,26 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    entrypoint: ["redis-server"]
+    command:
+      - "--save"
+      - ""
+      - "--appendonly"
+      - "yes"
     restart: unless-stopped
+  
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    volumes:
+      - ./data/minio:/data
+    ports:
+      - "9090:9000"
+      - "9091:9001"
+    environment:
+      MINIO_ROOT_USER:     admin
+      MINIO_ROOT_PASSWORD: password
+    command: server /data --console-address ":9001"
   
   squid:
     image: ubuntu/squid:latest
