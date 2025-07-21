@@ -130,7 +130,9 @@ async def install_conda_env(
     
 
 def pack_conda_env(env_name: str, r: StrictRedis, n_threads: int = -1) -> None: 
-
+    """
+        Packages the generated Conda enviroment, compresses w/ zstd, and pushes to Redis.
+    """
     out_path = mktemp(suffix=".tar.zst")
     logger.info(f"Packing environment '{env_name}' into {out_path}")
     # Pack Conda environment to buffer
@@ -155,13 +157,17 @@ def pack_conda_env(env_name: str, r: StrictRedis, n_threads: int = -1) -> None:
 
 
 def unpack_conda_env(env_name: str, r: StrictRedis, target_path: str) -> None:
+    """
+        Get packaged Conda environment from Redis and upack it.
+        Raises KeyError if Conda enviorment is not in Redis.
+    """
     buff = r.hget('conda_envs', env_name)
     if buff is None:
         raise KeyError(f"No entry for '{env_name}' in Redis hash 'conda_envs'")
 
     logger.info(f"Getting environment {env_name} from Redis")
     dctx = zstandard.ZstdDecompressor()
-    reader = dctx.stream_reader(BytesIO(buff))
+    reader = dctx.stream_reader(BytesIO(buff)) # type: ignore
 
     with tarfile.open(fileobj=reader, mode='r|*') as tar:
         tar.extractall(path=target_path)
