@@ -24,6 +24,27 @@
       }
     },
     {
+      "label": "Build rhea-worker (multi-arch)",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "buildx",
+        "build",
+        "-f",
+        "Dockerfile.agent",
+        "--platform",
+        "linux/amd64,linux/arm64",
+        "-t",
+        "chrisagrams/rhea-worker-agent:latest",
+        "."
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
       "label": "Build rhea-server (multi-arch)",
       "type": "shell",
       "command": "docker",

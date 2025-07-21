@@ -2,15 +2,20 @@ import os
 import subprocess
 import json
 import re
+import asyncio
+import logging
 from academy.agent import Agent, action
 from academy.logging import init_logging
 from typing import List, Optional
 from utils.schema import Tool, Param, ConfigFile
 from agent.schema import *
+from agent.utils import install_conda_env, configure_tool_directory
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from tempfile import TemporaryDirectory, NamedTemporaryFile, mkdtemp
 from minio import Minio
+from urllib3 import PoolManager
+from urllib3.util.retry import Retry
 from Cheetah.Template import Template
 
 
@@ -28,6 +33,7 @@ class RheaToolAgent(Agent):
         super().__init__()
         self.tool: Tool = tool
         self.installed_packages: List[str]
+        self.tool_directory: str | None = None
         self.connector = RedisConnector(redis_host, redis_port)
         self.replace_galaxy_var(
             "GALAXY_SLOTS", None
@@ -44,44 +50,39 @@ class RheaToolAgent(Agent):
             access_key=minio_access_key,
             secret_key=minio_secret_key,
             secure=minio_secure,
+            http_client=PoolManager(
+                num_pools=10,
+                maxsize=50,
+                retries=Retry(
+                    total=3,
+                    backoff_factor=0.2,
+                    status_forcelist=[500, 502, 503, 504]
+                )
+            )
         )
-        self.logger = init_logging()
+        self.logger = init_logging(level=logging.DEBUG)
+        self._startup_done = asyncio.Event()
+
 
     async def agent_on_startup(self) -> None:
-        # Create Conda environment and install Conda packages 
-        requirements = self.tool.requirements.requirements
-        packages = []
-        for requirement in requirements:
-            if requirement.type == "package":
-                packages.append(f"{requirement.value}={requirement.version}")
-            else:
-                raise NotImplementedError(
-                    f'Requirement type of "{requirement.type}" not yet implemented.'
-                )
-        self.logger.info(f"Installing Conda packages: {packages}")
-        try:
-            cmd = ["conda", "create", "-n", self.tool.id, "-y"] + packages
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Error installing Conda packages:\n {result.stdout}")
-        except Exception as e:
-            self.logger.error(f"First attempt to install Conda packages: {e}")
-            # Best-effort try installing the latest available package if our first attempt failed.
-            packages = [p.replace("=", ">=") for p in packages]
-            cmd = ["conda", "create", "-n", self.tool.id, "-y"] + packages
-            self.logger.info(f"Best-effort installing Conda packages: {packages}")
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Error installing Conda packages: {result.stdout}")
+        # Create coroutine to create Conda environment and install Conda packages 
+        conda_coro = install_conda_env(
+            env_name=self.tool.id,
+            requirements=self.tool.requirements.requirements
+        )
+        # Create coroutine to pull the tool files and configure tool directory
+        dir_coro = configure_tool_directory(self.tool.id, self.minio)
 
-        # List installed packages and parse into installed_packages
-        cmd = ["conda", "list", "-n", self.tool.id, "--json"]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Error listing Conda packages: {result.stdout}")
-        pkg_info = json.loads(result.stdout)
-        self.installed_packages = [f"{p['name']}={p['version']}" for p in pkg_info]
-        self.logger.info(f"Successfully installed packaged into Conda environment {self.tool.id}: {self.installed_packages}")
+        # Populate results
+        self.installed_packages, self.tool_directory = await asyncio.gather(
+            conda_coro,
+            dir_coro
+        )
+
+        self.logger.debug(f"self.installed_packages: {self.installed_packages}")
+        self.logger.debug(f"self.tool_directory: {self.tool_directory}")
+        self._startup_done.set() # Signal completion
+
 
     async def agent_on_shutdown(self) -> None:
         # Delete Conda environment
@@ -125,30 +126,7 @@ class RheaToolAgent(Agent):
                     f"Error in running tool version command: {result.stderr}"
                 )
             return result.stdout
-
-    def configure_tool_directory(self) -> str:
-        """
-        Configure the scripts required for the tool.
-        Pulls all objects from the repo from object store and places them into a temporary directory
-        Returns: A path to the temporary directory containing scripts
-        NOTE: Must cleanup after yourself!
-        """
-        dir = mkdtemp()
-
-        prefix = f"{self.tool.id}/"
-        for obj in self.minio.list_objects("dev", prefix=prefix, recursive=True):
-            name = obj.object_name
-            if name is not None:
-                resp = self.minio.get_object("dev", name)
-                content = resp.read()
-                local_path = os.path.join(dir, os.path.relpath(name, prefix))
-                os.makedirs(os.path.dirname(local_path), exist_ok=True)
-                with open(local_path, "wb") as f:
-                    f.write(content)
-                resp.close()
-                resp.release_conn()
-
-        return dir
+        
 
     def replace_galaxy_var(self, var: str, value: Optional[int] = None) -> None:
         """
@@ -280,7 +258,11 @@ class RheaToolAgent(Agent):
         input_store: Store
     ) -> None:
         # Configure parameters
-        env["__tool_directory__"] = self.configure_tool_directory()
+        self.logger.debug("here")
+        if self.tool_directory is not None:
+            env["__tool_directory__"] = self.tool_directory
+        else:
+            raise RuntimeError(f"Tool directory is not configured.")
 
         for param in params:
             if isinstance(param, RheaFileParam):
@@ -355,7 +337,10 @@ class RheaToolAgent(Agent):
 
     @action
     async def run_tool(self, params: List[RheaParam]) -> RheaOutput:
+        await self._startup_done.wait() # Wait until startup is complete.
+
         self.logger.info(f"Running tool with params: {params}")
+        self.logger.debug(f"self.tool_directory: {self.tool_directory}")
         env = os.environ.copy()
         with (
             Store("rhea-input", self.connector, register=True) as input_store,

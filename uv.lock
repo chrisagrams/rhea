@@ -640,6 +640,18 @@ wheels = [
 ]
 
 [[package]]
+name = "conda-pack"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/56/16/a8b6f2b391de51b7043581cffbaec90cf136deb1b22bc8f0a5f62054f0fe/conda_pack-0.8.1.tar.gz", hash = "sha256:eccb8ca49def7bae14430bfa7930d4876800ec83138a98d2e8b7bb7f9973319b", size = 47784, upload-time = "2024-11-15T16:07:10.22Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a2/2b/0e7e7b30b5e8cc5fb5bbed684b9f4a31e04bcf198561b2deef6c2789638e/conda_pack-0.8.1-py2.py3-none-any.whl", hash = "sha256:4ac43dbb5b5a1ee6f10df27f83fd227bfdd8a99cb2acbe6d05f1e5a0a681d307", size = 34228, upload-time = "2024-11-15T16:07:08.933Z" },
+]
+
+[[package]]
 name = "confluent-kafka"
 version = "2.10.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3218,6 +3230,7 @@ dependencies = [
     { name = "cachetools" },
     { name = "cheetah3" },
     { name = "chromadb" },
+    { name = "conda-pack" },
     { name = "debugpy" },
     { name = "fastapi", extra = ["standard"] },
     { name = "mcp", extra = ["cli"] },
@@ -3240,6 +3253,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=6.1.0" },
     { name = "cheetah3", specifier = ">=3.2.6.post1" },
     { name = "chromadb", specifier = ">=1.0.13" },
+    { name = "conda-pack", specifier = ">=0.8.1" },
     { name = "debugpy", specifier = ">=1.8.14" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.14" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.10.1" },
@@ -3465,6 +3479,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/78/46/db58cf700f1408cf0f63d3f939f7b077bd450da8e037310f70e74c41262f/setproctitle-1.3.6-pp310-pypy310_pp73-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:797f2846b546a8741413c57d9fb930ad5aa939d925c9c0fa6186d77580035af7", size = 13520, upload-time = "2025-04-29T13:34:44.287Z" },
     { url = "https://files.pythonhosted.org/packages/5c/46/0b89e7ebe77543e721c67077ad93fc8c7c3c31a8db3b12e00d02950f6adc/setproctitle-1.3.6-pp310-pypy310_pp73-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4ac3eb04bcf0119aadc6235a2c162bae5ed5f740e3d42273a7228b915722de20", size = 13094, upload-time = "2025-04-29T13:34:45.605Z" },
     { url = "https://files.pythonhosted.org/packages/f7/78/03f2e42eb83bce6f853d7751ae95f8a3ae7408145a0b6cdd717be01497d7/setproctitle-1.3.6-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:0e6b5633c94c5111f7137f875e8f1ff48f53b991d5d5b90932f27dc8c1fa9ae4", size = 12241, upload-time = "2025-04-29T13:34:46.996Z" },
+]
+
+[[package]]
+name = "setuptools"
+version = "80.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958, upload-time = "2025-05-27T00:56:51.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
 ]
 
 [[package]]
