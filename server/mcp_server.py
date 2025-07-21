@@ -229,24 +229,28 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
 
                 await ctx.report_progress(0.05, 1)
 
-                # Launch agent
-                future_handle = launch_agent(
-                    tool,
-                    redis_host=settings.agent_redis_host,
-                    redis_port=settings.agent_redis_port,
-                    minio_endpoint=settings.minio_endpoint,
-                    minio_access_key=settings.minio_access_key,
-                    minio_secret_key=settings.minio_secret_key,
-                    minio_secure=False,
-                )
+                if tool_id not in ctx.request_context.lifespan_context.agents:
+                    # Launch agent
+                    future_handle = launch_agent(
+                        tool,
+                        redis_host=settings.agent_redis_host,
+                        redis_port=settings.agent_redis_port,
+                        minio_endpoint=settings.minio_endpoint,
+                        minio_access_key=settings.minio_access_key,
+                        minio_secret_key=settings.minio_secret_key,
+                        minio_secure=False,
+                    )
 
-                unbound_handle: UnboundRemoteHandle = future_handle.result()
-               
-                handle: RemoteHandle = unbound_handle.bind_to_client(ctx.request_context.lifespan_context.academy_client)
+                    unbound_handle: UnboundRemoteHandle = future_handle.result()
+                
+                    handle: RemoteHandle = unbound_handle.bind_to_client(ctx.request_context.lifespan_context.academy_client)
 
-                ctx.info(f"Lanched agent {handle.agent_id}")
+                    ctx.info(f"Lanched agent {handle.agent_id}")
 
-                ctx.request_context.lifespan_context.agents[tool_id] = handle.agent_id
+                    ctx.request_context.lifespan_context.agents[tool_id] = handle
+
+                # Get handle from dictionary
+                handle: RemoteHandle = ctx.request_context.lifespan_context.agents[tool_id]
 
                 ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
                 await ctx.report_progress(0.1, 1)
