@@ -22,7 +22,14 @@ from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from utils.models import Base
 from utils.schema import Tool, Inputs
-from server.schema import AppContext, MCPOutput, MCPDataOutput, MCPTool, Settings, PBSSettings
+from server.schema import (
+    AppContext,
+    MCPOutput,
+    MCPDataOutput,
+    MCPTool,
+    Settings,
+    PBSSettings,
+)
 from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import generate_parsl_config
 from parsl.errors import ConfigurationError
@@ -38,15 +45,20 @@ from pathlib import Path
 
 
 parser = ArgumentParser()
-parser.add_argument("--transport", choices=("stdio", "sse"), default="stdio", help="Transport protocol to run (stdio or sse)")
+parser.add_argument(
+    "--transport",
+    choices=("stdio", "sse"),
+    default="stdio",
+    help="Transport protocol to run (stdio or sse)",
+)
 args = parser.parse_args()
 
 settings = Settings()
 
 pbs_settings = None
-if Path('.env_pbs').exists():
+if Path(".env_pbs").exists():
     try:
-        pbs_settings = PBSSettings() # type: ignore
+        pbs_settings = PBSSettings()  # type: ignore
     except ValidationError:
         pbs_settings = None
 
@@ -83,7 +95,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         except ConfigurationError:
             pass
 
-        chroma_client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
+        chroma_client = chromadb.HttpClient(
+            host=settings.chroma_host, port=settings.chroma_port
+        )
         openai_ef = embedding_functions.OpenAIEmbeddingFunction(
             api_key=settings.vllm_key,
             api_base=settings.vllm_url,
@@ -100,8 +114,8 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         else:
             raise ValueError(
                 "CHROMA_COLLECTION must be set (got None); cannot initialize ChromaDB collection"
-            ) 
-        
+            )
+
         factory = RedisExchangeFactory(settings.redis_host, settings.redis_port)
         academy_client = await factory.create_user_client(name="rhea-manager")
 
@@ -119,17 +133,16 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             connector=connector,
             academy_client=academy_client,
             galaxy_tools=galaxy_tools,
-            agents = {}
+            agents={},
         )
     except Exception as e:
         logger.error(e)
 
-    finally: # Application shutdown
+    finally:  # Application shutdown
         if academy_client is not None:
             await academy_client.close()
         parsl.clear()
         parsl.dfk().cleanup()
-
 
 
 mcp = FastMCP("Rhea", lifespan=app_lifespan)
@@ -143,9 +156,7 @@ lowlevel_server.notification_options.tools_changed = True
 def construct_params(inputs: Inputs) -> List[Parameter]:
     res = []
     for param in inputs.params:
-        res.append(
-            param.to_python_parameter()
-        )
+        res.append(param.to_python_parameter())
     return res
 
 
@@ -154,7 +165,7 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
 
     for param in inputs.params:
         a = args.get(param.name, None)
-    
+
         if a is not None:
             if param.type == "data":
                 res.append(RheaParam.from_param(param, RedisKey(a)))
@@ -164,10 +175,7 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
     return res
 
 
-@mcp.tool(
-        name="find_tools",
-        title="Find Tools"
-)
+@mcp.tool(name="find_tools", title="Find Tools")
 async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
 
@@ -177,7 +185,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
         if t != keep:
             mcp._tool_manager._tools.pop(t)
 
-    # Clear previous tool documentations 
+    # Clear previous tool documentations
     for r in list(mcp._resource_manager._resources.keys()):
         if "Documentation" in r:
             mcp._resource_manager._resources.pop(r)
@@ -202,11 +210,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
 
         # Add Context to tool params
         params.append(
-            Parameter(
-                "ctx",
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=Context
-            )
+            Parameter("ctx", kind=Parameter.POSITIONAL_OR_KEYWORD, annotation=Context)
         )
 
         sig = Signature(parameters=params, return_annotation=MCPOutput)
@@ -224,7 +228,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
                 for name, value in zip(param_names, args):
                     kwargs.setdefault(name, value)
 
-                # Construct RheaParams 
+                # Construct RheaParams
                 rhea_params = process_user_inputs(tool.inputs, kwargs)
 
                 await ctx.report_progress(0.05, 1)
@@ -242,21 +246,25 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
                     )
 
                     unbound_handle: UnboundRemoteHandle = future_handle.result()
-                
-                    handle: RemoteHandle = unbound_handle.bind_to_client(ctx.request_context.lifespan_context.academy_client)
+
+                    handle: RemoteHandle = unbound_handle.bind_to_client(
+                        ctx.request_context.lifespan_context.academy_client
+                    )
 
                     ctx.info(f"Lanched agent {handle.agent_id}")
 
                     ctx.request_context.lifespan_context.agents[tool_id] = handle
 
                 # Get handle from dictionary
-                handle: RemoteHandle = ctx.request_context.lifespan_context.agents[tool_id]
+                handle: RemoteHandle = ctx.request_context.lifespan_context.agents[
+                    tool_id
+                ]
 
                 ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
                 await ctx.report_progress(0.1, 1)
 
                 # Execute tool
-                tool_result: RheaOutput = await ( await handle.run_tool(rhea_params) )
+                tool_result: RheaOutput = await (await handle.run_tool(rhea_params))
 
                 ctx.info(f"Tool {tool_id} finished in {handle.agent_id}")
                 await ctx.report_progress(1, 1)
@@ -268,7 +276,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
             return wrapper
 
         # Create tool.call()
-        safe_name = tool.name.lower().replace(" ", "_") # Normalize tool name
+        safe_name = tool.name.lower().replace(" ", "_")  # Normalize tool name
         fn = make_wrapper(tool.id, [name for name in params])
         fn.__name__ = safe_name
         fn.__doc__ = tool.description
@@ -282,11 +290,15 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
 
         # Add documentation resource to MCP server
         mcp.add_resource(
-            resource = TextResource(
+            resource=TextResource(
                 uri=AnyUrl(url=f"resource://documentation/{tool.name}"),
                 name=f"{tool.name} Documentation",
                 description=f"Full documentation for {tool.name}",
-                text=tool.documentation if tool.documentation is not None else f"Documentation for '{tool.name}' is not available.",
+                text=(
+                    tool.documentation
+                    if tool.documentation is not None
+                    else f"Documentation for '{tool.name}' is not available."
+                ),
                 mime_type="text/markdown",
             )
         )
@@ -294,17 +306,16 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
         # Add MCPTool to result
         result.append(MCPTool.from_rhea(tool))
 
-    await ctx.request_context.session.send_tool_list_changed() # notifiactions/tools/list_changed
-    await ctx.request_context.session.send_resource_list_changed() # notifications/resources/list_changed
-    
+    await ctx.request_context.session.send_tool_list_changed()  # notifiactions/tools/list_changed
+    await ctx.request_context.session.send_resource_list_changed()  # notifications/resources/list_changed
+
     return result
 
 
 async def serve_stdio():
     async with stdio_server() as (r, w):
         init_opts = lowlevel_server.create_initialization_options(
-            lowlevel_server.notification_options,
-            {}
+            lowlevel_server.notification_options, {}
         )
         await lowlevel_server.run(r, w, init_opts)
 
@@ -316,23 +327,26 @@ async def serve_sse():
     from starlette.responses import Response
 
     sse = SseServerTransport("/messages/")
-    
+
     async def handle_sse(request):
         async with sse.connect_sse(
             request.scope, request.receive, request._send
         ) as streams:
             await lowlevel_server.run(
-                streams[0], streams[1], 
+                streams[0],
+                streams[1],
                 lowlevel_server.create_initialization_options(
                     lowlevel_server.notification_options
-                )
+                ),
             )
         return Response()
 
-    app = Starlette(routes=[
-        Route("/sse", endpoint=handle_sse, methods=["GET"]),
-        Mount("/messages/", app=sse.handle_post_message),
-    ])
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse, methods=["GET"]),
+            Mount("/messages/", app=sse.handle_post_message),
+        ]
+    )
     config = uvicorn.Config(app, host=settings.host, port=settings.port)
     server = uvicorn.Server(config)
     await server.serve()
@@ -344,7 +358,7 @@ async def main():
             await serve_stdio()
         case "sse":
             await serve_sse()
-        
+
 
 if __name__ == "__main__":
     anyio.run(main)

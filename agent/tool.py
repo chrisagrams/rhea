@@ -54,37 +54,32 @@ class RheaToolAgent(Agent):
                 num_pools=10,
                 maxsize=50,
                 retries=Retry(
-                    total=3,
-                    backoff_factor=0.2,
-                    status_forcelist=[500, 502, 503, 504]
-                )
-            )
+                    total=3, backoff_factor=0.2, status_forcelist=[500, 502, 503, 504]
+                ),
+            ),
         )
         self.logger = init_logging(level=logging.DEBUG)
         self._startup_done = asyncio.Event()
 
-
     async def agent_on_startup(self) -> None:
-        # Create coroutine to create Conda environment and install Conda packages 
+        # Create coroutine to create Conda environment and install Conda packages
         conda_coro = install_conda_env(
             env_name=self.tool.id,
             requirements=self.tool.requirements.requirements,
             r=self.connector._redis_client,
-            target_path=f"/home/rhea/conda/envs/{self.tool.id}"
+            target_path=f"/home/rhea/conda/envs/{self.tool.id}",
         )
         # Create coroutine to pull the tool files and configure tool directory
         dir_coro = configure_tool_directory(self.tool.id, self.minio)
 
         # Populate results
         self.installed_packages, self.tool_directory = await asyncio.gather(
-            conda_coro,
-            dir_coro
+            conda_coro, dir_coro
         )
 
         self.logger.debug(f"self.installed_packages: {self.installed_packages}")
         self.logger.debug(f"self.tool_directory: {self.tool_directory}")
-        self._startup_done.set() # Signal completion
-
+        self._startup_done.set()  # Signal completion
 
     async def agent_on_shutdown(self) -> None:
         # Delete Conda environment
@@ -128,7 +123,6 @@ class RheaToolAgent(Agent):
                     f"Error in running tool version command: {result.stderr}"
                 )
             return result.stdout
-        
 
     def replace_galaxy_var(self, var: str, value: Optional[int] = None) -> None:
         """
@@ -143,52 +137,53 @@ class RheaToolAgent(Agent):
 
         self.tool.command.command = pattern.sub(_repl, self.tool.command.command)
 
-    
     def apply_interpreter_command(self) -> str:
         """
         Command might have an "interpreter" section, append it before the command. (e.g. python)
         """
-        if self.tool.command.interpreter is not None and self.tool.command.interpreter != "":
+        if (
+            self.tool.command.interpreter is not None
+            and self.tool.command.interpreter != ""
+        ):
             return f"{self.tool.command.interpreter} {self.tool.command.command}"
         return self.tool.command.command
 
-
     def expand_galaxy_if(self, cmd: str, env: dict[str, Any]) -> str:
-        var_pattern = re.compile(r'\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?')
-        vars_ = sorted(set(var_pattern.findall(cmd)),
-                    key=lambda v: v.count('.'),
-                    reverse=True)
-        nested_roots = {v.split('.')[0] for v in vars_ if '.' in v}
+        var_pattern = re.compile(r"\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?")
+        vars_ = sorted(
+            set(var_pattern.findall(cmd)), key=lambda v: v.count("."), reverse=True
+        )
+        nested_roots = {v.split(".")[0] for v in vars_ if "." in v}
 
         context: dict[str, Any] = {}
         for k, v in env.items():
-            if '.' not in k:
+            if "." not in k:
                 if isinstance(v, (list, GalaxyFileVar)):
                     context[k] = v
                 else:
                     context[k] = GalaxyVar(v)
 
         for k, v in env.items():
-            if '.' in k:
-                root, rest = k.split('.', 1)
+            if "." in k:
+                root, rest = k.split(".", 1)
                 if root not in context:
-                    context[root] = GalaxyVar('')
-                
+                    context[root] = GalaxyVar("")
+
                 if isinstance(context[root], GalaxyVar):
                     context[root].set_nested(rest, v)
 
         for var in vars_:
-            parts = var.split('.')
+            parts = var.split(".")
             if len(parts) == 1:
                 root = parts[0]
                 if root not in nested_roots and root not in context:
-                    context[root] = GalaxyVar('')
+                    context[root] = GalaxyVar("")
             else:
                 # Handle multi-level nesting
                 root = parts[0]
                 if root not in context:
-                    context[root] = GalaxyVar('')
-                
+                    context[root] = GalaxyVar("")
+
                 # Build the nested structure level by level
                 current = context[root]
                 for i in range(1, len(parts)):
@@ -197,14 +192,14 @@ class RheaToolAgent(Agent):
                         if nested_key not in current._nested:
                             # If this is the last part, set empty string, otherwise create new GalaxyVar
                             if i == len(parts) - 1:
-                                current.set_nested(nested_key, '')
+                                current.set_nested(nested_key, "")
                             else:
-                                current.set_nested(nested_key, GalaxyVar(''))
+                                current.set_nested(nested_key, GalaxyVar(""))
                         current = current._nested[nested_key]
 
         tmpl = Template(source=cmd, searchList=[context])
         return tmpl.respond()
-    
+
     def unescape_bash_vars(self, cmd: str) -> str:
         """
         Turn every '\\$foo' into '$foo' so that bash will expand it at runtime.
@@ -226,30 +221,34 @@ class RheaToolAgent(Agent):
     def quote_shell_params(self, cmd: str) -> str:
         # split out double- or single-quoted spans
         parts = re.split(r'(".*?"|\'.*?\')', cmd)
+
         def wrap(seg: str) -> str:
             # leave quoted spans untouched
             if seg and seg[0] in ('"', "'"):
                 return seg
             # match unescaped $VAR or ${VAR}, wrap in quotes
-            return re.sub(
-                r'(?<!\\)(\$(?:\{[^}]+\}|[A-Za-z_]\w*))',
-                r'"\1"',
-                seg
-            )
-        return ''.join(wrap(p) for p in parts)
-    
+            return re.sub(r"(?<!\\)(\$(?:\{[^}]+\}|[A-Za-z_]\w*))", r'"\1"', seg)
+
+        return "".join(wrap(p) for p in parts)
+
     def replace_dotted_vars(self, cmd: str) -> str:
         """
         Replace bash vars like $name.value or ${name.value} with $name_value or ${name_value}.
         """
-        pattern = re.compile(r'(?<!\\)\$(\{)?([A-Za-z_]\w*)\.([A-Za-z_]\w*)(\})?')
+        pattern = re.compile(r"(?<!\\)\$(\{)?([A-Za-z_]\w*)\.([A-Za-z_]\w*)(\})?")
+
         def repl(m: re.Match) -> str:
-            has_brace, var, field, closing = m.group(1), m.group(2), m.group(3), m.group(4)
+            has_brace, var, field, closing = (
+                m.group(1),
+                m.group(2),
+                m.group(3),
+                m.group(4),
+            )
             if has_brace:
-                return f'${{{var}_{field}}}'
-            return f'${var}_{field}'
+                return f"${{{var}_{field}}}"
+            return f"${var}_{field}"
+
         return pattern.sub(repl, cmd)
-        
 
     def build_env_parameters(
         self,
@@ -257,7 +256,7 @@ class RheaToolAgent(Agent):
         params: List[RheaParam],
         tool_params: List[Param],
         input_dir: str,
-        input_store: Store
+        input_store: Store,
     ) -> None:
         # Configure parameters
         if self.tool_directory is not None:
@@ -273,13 +272,11 @@ class RheaToolAgent(Agent):
                     if buffer is not None:
                         f.write(buffer)
                     else:
-                        raise KeyError(
-                            f"No file associated with key {param.value}"
-                        )
+                        raise KeyError(f"No file associated with key {param.value}")
                     self.logger.debug(f"Wrote '{param.value}' to '{tmp_file_path}'")
-                
+
                 file_var = GalaxyFileVar(tmp_file_path, param.filename)
-                
+
                 if param.name in env:
                     if isinstance(env[param.name], list):
                         env[param.name].append(file_var)
@@ -287,7 +284,7 @@ class RheaToolAgent(Agent):
                         env[param.name] = [env[param.name], file_var]
                 else:
                     env[param.name] = file_var
-                    
+
             elif isinstance(param, RheaBooleanParam):
                 if param.checked or param.value:
                     value = param.truevalue
@@ -307,29 +304,30 @@ class RheaToolAgent(Agent):
                 for p in param.values:
                     values.append(p.value)
                 env[param.name] = values
-        
+
         # For params that were not provided (optional ones), put their default value
         for param in tool_params:
             if param.optional:
                 if param.name not in env and param.name is not None:
                     if param.value is not None:
                         env[param.name] = param.value
-            
 
     def build_output_env_parameters(
-            self,
-            env: dict[str, str],
-            output_dir: str,
+        self,
+        env: dict[str, str],
+        output_dir: str,
     ) -> None:
         if self.tool.outputs.data is not None:
             for out in self.tool.outputs.data:
                 if out.from_work_dir is None or out.from_work_dir == "":
                     env[out.name] = os.path.join(output_dir, out.name)
                 else:
-                    env[out.name] = os.path.join(env["__tool_directory__"], out.from_work_dir) # Get the file out of the workdir
+                    env[out.name] = os.path.join(
+                        env["__tool_directory__"], out.from_work_dir
+                    )  # Get the file out of the workdir
 
     def build_configfile(self, env: dict[str, str], configfile: ConfigFile) -> str:
-        with NamedTemporaryFile('w', delete=False) as tf:
+        with NamedTemporaryFile("w", delete=False) as tf:
             script_path = tf.name
             text = self.expand_galaxy_if(configfile.text, env)
             tf.write(text)
@@ -339,7 +337,7 @@ class RheaToolAgent(Agent):
 
     @action
     async def run_tool(self, params: List[RheaParam]) -> RheaOutput:
-        await self._startup_done.wait() # Wait until startup is complete.
+        await self._startup_done.wait()  # Wait until startup is complete.
 
         self.logger.info(f"Running tool with params: {params}")
         self.logger.debug(f"self.tool_directory: {self.tool_directory}")
@@ -352,20 +350,25 @@ class RheaToolAgent(Agent):
                 cwd = output
 
                 # Populate input environment variables
-                self.build_env_parameters(env, params, self.tool.inputs.params, input, input_store)
+                self.build_env_parameters(
+                    env, params, self.tool.inputs.params, input, input_store
+                )
 
                 # Configure outputs
                 self.build_output_env_parameters(env, output)
 
                 # Configure configfiles (if any)
-                if self.tool.configfiles is not None and self.tool.configfiles.configfiles is not None:
+                if (
+                    self.tool.configfiles is not None
+                    and self.tool.configfiles.configfiles is not None
+                ):
                     for configfile in self.tool.configfiles.configfiles:
                         self.build_configfile(env, configfile)
-                
+
                 # Configure command script
                 cmd = self.apply_interpreter_command()
                 cmd = self.expand_galaxy_if(cmd, env)
-                cmd = cmd.replace('\n', ' ')
+                cmd = cmd.replace("\n", " ")
                 cmd = self.unescape_bash_vars(cmd)
                 cmd = self.fix_var_quotes(cmd)
                 cmd = self.quote_shell_params(cmd)
@@ -385,7 +388,7 @@ class RheaToolAgent(Agent):
                         env[k] = str(v)
                     elif isinstance(v, GalaxyFileVar):
                         env[k] = str(v)
-                
+
                 # Run tool
                 cmd = [
                     "conda",
@@ -398,10 +401,16 @@ class RheaToolAgent(Agent):
                 ]
                 self.logger.info(f"Running subprocess: {cmd}")
                 result = subprocess.run(
-                    cmd, env=env, cwd=env["__tool_directory__"], capture_output=True, text=True
+                    cmd,
+                    env=env,
+                    cwd=env["__tool_directory__"],
+                    capture_output=True,
+                    text=True,
                 )
                 if result.returncode != 0:
-                    self.logger.error(f"Error in running tool command: \n{result.stdout}\n{result.stderr}")
+                    self.logger.error(
+                        f"Error in running tool command: \n{result.stdout}\n{result.stderr}"
+                    )
                     raise Exception(f"Error in running tool command: {result.stderr}")
 
                 # Get outputs
@@ -421,7 +430,10 @@ class RheaToolAgent(Agent):
                                 try:
                                     outputs.files.append(
                                         RheaDataOutput.from_file(
-                                            env[out.name], output_store, name=out.name, format=out.format
+                                            env[out.name],
+                                            output_store,
+                                            name=out.name,
+                                            format=out.format,
                                         )
                                     )
                                 except Exception:
@@ -429,7 +441,10 @@ class RheaToolAgent(Agent):
                             else:
                                 outputs.files.append(
                                     RheaDataOutput.from_file(
-                                        env[out.name], output_store, name=out.name, format=out.format
+                                        env[out.name],
+                                        output_store,
+                                        name=out.name,
+                                        format=out.format,
                                     )
                                 )
 
@@ -443,6 +458,6 @@ class RheaToolAgent(Agent):
                     if outputs.files is None:
                         outputs.files = []
                         outputs.resolve(output, output_store)
-                
+
                 self.logger.info(f"Finished tool execution with results: {outputs}")
                 return outputs

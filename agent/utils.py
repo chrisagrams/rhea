@@ -15,13 +15,12 @@ from minio import Minio
 from redis import StrictRedis
 
 
-
 logger = logging.getLogger(__name__)
 
+
 def requirements_to_package_list(
-        requirements: List[Requirement],
-        strict: bool = True
-    ) -> List[str]:
+    requirements: List[Requirement], strict: bool = True
+) -> List[str]:
     """
     Convert a Galaxy-style requirements list into Conda package specifications.
 
@@ -54,7 +53,10 @@ async def configure_tool_directory(tool_id: str, minio: Minio) -> str:
     Returns: A path to the temporary directory containing scripts
     NOTE: Must cleanup after yourself!
     """
-    async def _fetch_and_write(minio: Minio, bucket: str, obj, dest_dir: str, prefix: str):
+
+    async def _fetch_and_write(
+        minio: Minio, bucket: str, obj, dest_dir: str, prefix: str
+    ):
         name = obj.object_name
         if not name:
             return
@@ -74,19 +76,18 @@ async def configure_tool_directory(tool_id: str, minio: Minio) -> str:
     prefix = f"{tool_id}/"
 
     objs = await asyncio.to_thread(
-        lambda: list(minio.list_objects('dev', prefix=prefix, recursive=True))
+        lambda: list(minio.list_objects("dev", prefix=prefix, recursive=True))
     )
     logger.info(f"Pulling {len(objs)} objects.")
 
     tasks = [
-        asyncio.create_task(_fetch_and_write(minio, 'dev', obj, dest_dir, prefix))
+        asyncio.create_task(_fetch_and_write(minio, "dev", obj, dest_dir, prefix))
         for obj in objs
     ]
 
     await asyncio.gather(*tasks)
     logger.info(f"Objects pulled into {dest_dir}")
     return dest_dir
-
 
 
 async def install_conda_env(
@@ -99,7 +100,7 @@ async def install_conda_env(
     loop = asyncio.get_running_loop()
 
     # If Conda environment is cached, unpack and return immediately
-    exists = await loop.run_in_executor(None, r.hexists, 'conda_envs', env_name)
+    exists = await loop.run_in_executor(None, r.hexists, "conda_envs", env_name)
     if exists:
         await loop.run_in_executor(None, unpack_conda_env, env_name, r, target_path)
         return []
@@ -109,38 +110,29 @@ async def install_conda_env(
     for strict in (True, False):
         packages = requirements_to_package_list(requirements, strict=strict)
         proc = await asyncio.create_subprocess_exec(
-            "conda", "create", "-n", env_name, "-y", *packages,
-            stdout=PIPE, stderr=PIPE
+            "conda", "create", "-n", env_name, "-y", *packages, stdout=PIPE, stderr=PIPE
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
             break
         if not strict:
-            raise RuntimeError(
-                stdout.decode().strip() + "\n" + stderr.decode().strip()
-            )
+            raise RuntimeError(stdout.decode().strip() + "\n" + stderr.decode().strip())
 
     # Pack the environment in another thread
-    future = loop.run_in_executor(
-        None, pack_conda_env, env_name, r, n_threads
-    )
+    future = loop.run_in_executor(None, pack_conda_env, env_name, r, n_threads)
     asyncio.ensure_future(future)
 
     return packages
-    
 
-def pack_conda_env(env_name: str, r: StrictRedis, n_threads: int = -1) -> None: 
+
+def pack_conda_env(env_name: str, r: StrictRedis, n_threads: int = -1) -> None:
     """
-        Packages the generated Conda enviroment, compresses w/ zstd, and pushes to Redis.
+    Packages the generated Conda enviroment, compresses w/ zstd, and pushes to Redis.
     """
     out_path = mktemp(suffix=".tar.zst")
     logger.info(f"Packing environment '{env_name}' into {out_path}")
     # Pack Conda environment to buffer
-    conda_pack.pack(
-        name=env_name,
-        output=out_path,
-        n_threads=n_threads
-    )
+    conda_pack.pack(name=env_name, output=out_path, n_threads=n_threads)
     with open(out_path, mode="rb") as f:
         buff = f.read()
         logger.debug(f"Resulting size of packed environment '{env_name}': {len(buff)}")
@@ -150,7 +142,7 @@ def pack_conda_env(env_name: str, r: StrictRedis, n_threads: int = -1) -> None:
 
         # Create Redis transaction and add buffer
         pipe = r.pipeline(transaction=True)
-        pipe.hset('conda_envs', mapping={ env_name : buff })
+        pipe.hset("conda_envs", mapping={env_name: buff})
         pipe.execute()
         logger.info(f"Environment '{env_name}' stored in Redis.")
     os.remove(out_path)
@@ -158,20 +150,20 @@ def pack_conda_env(env_name: str, r: StrictRedis, n_threads: int = -1) -> None:
 
 def unpack_conda_env(env_name: str, r: StrictRedis, target_path: str) -> None:
     """
-        Get packaged Conda environment from Redis and upack it.
-        Raises KeyError if Conda enviorment is not in Redis.
+    Get packaged Conda environment from Redis and upack it.
+    Raises KeyError if Conda enviorment is not in Redis.
     """
-    buff = r.hget('conda_envs', env_name)
+    buff = r.hget("conda_envs", env_name)
     if buff is None:
         raise KeyError(f"No entry for '{env_name}' in Redis hash 'conda_envs'")
 
     logger.info(f"Getting environment {env_name} from Redis")
     dctx = zstandard.ZstdDecompressor()
-    reader = dctx.stream_reader(BytesIO(buff)) # type: ignore
+    reader = dctx.stream_reader(BytesIO(buff))  # type: ignore
 
-    with tarfile.open(fileobj=reader, mode='r|*') as tar:
+    with tarfile.open(fileobj=reader, mode="r|*") as tar:
         tar.extractall(path=target_path)
-    
+
     conda_unpack = os.path.join(target_path, "bin", "conda-unpack")
     subprocess.run([conda_unpack], cwd=target_path, check=True)
     logger.info(f"Unpacked environment {env_name}")

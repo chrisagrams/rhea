@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional, Literal
 
+
 @dataclass
 class AppContext:
     logger: Logger
@@ -28,7 +29,7 @@ class AppContext:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8')
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     host: str = "localhost"
     port: int = 3001
@@ -46,7 +47,7 @@ class Settings(BaseSettings):
     parsl_max_blocks: int = 5
     parsl_nodes_per_block: int = 1
     parsl_parallelism: int = 1
-    
+
     redis_host: str = "localhost"
     redis_port: int = 6379
 
@@ -70,15 +71,15 @@ class Settings(BaseSettings):
 
 
 class PBSSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env_pbs', env_file_encoding='utf-8')
+    model_config = SettingsConfigDict(env_file=".env_pbs", env_file_encoding="utf-8")
 
-    account: str 
+    account: str
     queue: str
     walltime: str
     scheduler_options: str
     select_options: str
-    worker_init: str = '' # Commands to run before workers launched
-    cpus_per_node: int = 1 # Hardware threads per node
+    worker_init: str = ""  # Commands to run before workers launched
+    cpus_per_node: int = 1  # Hardware threads per node
 
 
 class MCPDataOutput(BaseModel):
@@ -95,7 +96,7 @@ class MCPDataOutput(BaseModel):
             size=p.size,
             filename=p.filename,
             name=p.name,
-            format=p.format
+            format=p.format,
         )
 
 
@@ -113,10 +114,7 @@ class MCPOutput(BaseModel):
             for f in p.files:
                 files.append(MCPDataOutput.from_rhea(f))
         return cls(
-            return_code=p.return_code,
-            stdout=p.stdout,
-            stderr=p.stderr,
-            files=files
+            return_code=p.return_code, stdout=p.stdout, stderr=p.stderr, files=files
         )
 
 
@@ -130,5 +128,6 @@ class MCPTool(BaseModel):
         return cls(
             name=t.name,
             description=t.description,
-            long_description=t.long_description or "Long description not available for this tool."
+            long_description=t.long_description
+            or "Long description not available for this tool.",
         )

@@ -23,26 +23,26 @@ class GalaxyFileVar:
     def ext(self):
         """Get file extension"""
         if self.filename:
-            return self.filename.split('.')[-1]
-        return os.path.splitext(self.path)[1].lstrip('.')
+            return self.filename.split(".")[-1]
+        return os.path.splitext(self.path)[1].lstrip(".")
 
     def is_of_type(self, file_type: str) -> bool:
         """Check if file is of given type"""
         ext = self.ext.lower()
-        
+
         type_mappings = {
-            'fasta': ['fa', 'fasta', 'fna', 'ffn', 'faa', 'frn'],
-            'fastq': ['fq', 'fastq'],
-            'sam': ['sam'],
-            'bam': ['bam'],
-            'vcf': ['vcf'],
-            'gff': ['gff', 'gff3'],
-            'bed': ['bed'],
+            "fasta": ["fa", "fasta", "fna", "ffn", "faa", "frn"],
+            "fastq": ["fq", "fastq"],
+            "sam": ["sam"],
+            "bam": ["bam"],
+            "vcf": ["vcf"],
+            "gff": ["gff", "gff3"],
+            "bed": ["bed"],
         }
-        
+
         if file_type.lower() in type_mappings:
             return ext in type_mappings[file_type.lower()]
-        
+
         return ext == file_type.lower()
 
 
@@ -50,15 +50,15 @@ class GalaxyVar:
     def __init__(self, value):
         self._value = value
         self._nested = {}
-    
+
     def __str__(self):
         if self._value is None:
-            return ''
+            return ""
         return str(self._value)
-    
+
     def set_nested(self, key: str, value):
         self._nested[key] = value
-    
+
     def __getattr__(self, name):
         if name in self._nested:
             return self._nested[name]
@@ -67,23 +67,23 @@ class GalaxyVar:
             if callable(attr):
                 return attr
             return attr
-        return ''
-    
+        return ""
+
     def __iter__(self):
         return iter(self._value)
-    
+
     def __len__(self):
         return len(self._value)
-    
+
     def __getitem__(self, key):
         return self._value[key]
-    
+
     def __contains__(self, item):
         return item in self._value
-    
+
     def __bool__(self):
         return bool(self._value)
-    
+
     def __eq__(self, other):
         if isinstance(other, GalaxyVar):
             return self._value == other._value
@@ -99,7 +99,7 @@ class RheaParam:
     def __str__(self) -> str:
         arg = f", argument={self.argument!r}" if self.argument is not None else ""
         return f"RheaParam(name={self.name!r}, type={self.type!r}{arg})"
-    
+
     __repr__ = __str__
 
     @classmethod
@@ -114,25 +114,29 @@ class RheaParam:
             return RheaFileParam.from_param(param, value)
         elif param.type == "text":  # RheaTextParam
             if param.optional and value is None:
-                return RheaTextParam.from_param(param, '')
+                return RheaTextParam.from_param(param, "")
             if type(value) is not str:
                 raise ValueError("Value must be a 'str' for text param.")
             return RheaTextParam.from_param(param, value)
-        elif param.type == "integer": # RheaIntegerParam
+        elif param.type == "integer":  # RheaIntegerParam
             if isinstance(value, str):
                 try:
                     value = int(value)
                 except ValueError:
-                    raise ValueError("Value must be an 'int' or string castable to 'int' for integer param.")
+                    raise ValueError(
+                        "Value must be an 'int' or string castable to 'int' for integer param."
+                    )
             if not isinstance(value, int):
                 raise ValueError("Value must be an 'int' for integer param.")
             return RheaIntegerParam.from_param(param, value)
-        elif param.type == "float": # RheaFloatParam
+        elif param.type == "float":  # RheaFloatParam
             if isinstance(value, str):
                 try:
                     value = float(value)
                 except ValueError:
-                    raise ValueError("Value must be a 'float' or string castable to 'float' for float param.")
+                    raise ValueError(
+                        "Value must be a 'float' or string castable to 'float' for float param."
+                    )
             if not isinstance(value, float):
                 raise ValueError("Value must be a 'float' for float param.")
             return RheaFloatParam.from_param(param, value)
@@ -211,7 +215,7 @@ class RheaBooleanParam(RheaParam):
         self.falsevalue = falsevalue
         self.value = value
         self.checked = checked
-    
+
     def __str__(self) -> str:
         arg = f", argument={self.argument!r}" if self.argument is not None else ""
         val = f", value={self.value!r}" if self.value is not None else ""
@@ -250,7 +254,7 @@ class RheaTextParam(RheaParam):
     ) -> None:
         super().__init__(name, type, argument)
         self.value = value
-    
+
     def __str__(self) -> str:
         arg = f", argument={self.argument!r}" if self.argument is not None else ""
         return f"RheaTextParam(name={self.name!r}, type={self.type!r}{arg}, value={self.value!r})"
@@ -262,19 +266,25 @@ class RheaTextParam(RheaParam):
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         if param.value is None and param.optional:
-            return cls(name=param.name, type=param.type, value='') 
+            return cls(name=param.name, type=param.type, value="")
         return cls(name=param.name, type=param.type, value=value)
 
 
 class RheaIntegerParam(RheaParam):
     def __init__(
-            self, name: str, type: str, value: int, min: int | None = None, max: int | None = None, argument: str | None = None,
-    ) -> None: 
+        self,
+        name: str,
+        type: str,
+        value: int,
+        min: int | None = None,
+        max: int | None = None,
+        argument: str | None = None,
+    ) -> None:
         super().__init__(name, type, argument)
         self.value = value
         self.min = min
         self.max = max
-    
+
     def __str__(self) -> str:
         arg = f", argument={self.argument!r}" if self.argument is not None else ""
         min_str = f", min={self.min!r}" if self.min is not None else ""
@@ -285,23 +295,31 @@ class RheaIntegerParam(RheaParam):
         )
 
     __repr__ = __str__
-    
+
     @classmethod
-    def from_param(cls, param: Param, value: int, min: int | None = None, max: int | None = None) -> "RheaIntegerParam":
+    def from_param(
+        cls, param: Param, value: int, min: int | None = None, max: int | None = None
+    ) -> "RheaIntegerParam":
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value, min=min, max=max)
-    
+
 
 class RheaFloatParam(RheaParam):
     def __init__(
-            self, name: str, type: str, value: float, min: float | None = None, max: float | None = None, argument: str | None = None,
+        self,
+        name: str,
+        type: str,
+        value: float,
+        min: float | None = None,
+        max: float | None = None,
+        argument: str | None = None,
     ) -> None:
         super().__init__(name, type, argument)
         self.value = value
         self.min = min
         self.max = max
-    
+
     def __str__(self) -> str:
         arg = f", argument={self.argument!r}" if self.argument is not None else ""
         min_str = f", min={self.min!r}" if self.min is not None else ""
@@ -313,12 +331,18 @@ class RheaFloatParam(RheaParam):
 
     __repr__ = __str__
 
-    @classmethod 
-    def from_param(cls, param: Param, value: float, min: float | None = None, max: float | None = None) -> "RheaFloatParam":
+    @classmethod
+    def from_param(
+        cls,
+        param: Param,
+        value: float,
+        min: float | None = None,
+        max: float | None = None,
+    ) -> "RheaFloatParam":
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value, min=min, max=max)
-        
+
 
 class RheaSelectParam(RheaParam):
     def __init__(
@@ -346,13 +370,17 @@ class RheaSelectParam(RheaParam):
             if option.selected:
                 return cls(name=param.name, type=param.type, value=option.value)
         if param.optional:
-            return cls(name=param.name, type=param.type, value='')            
+            return cls(name=param.name, type=param.type, value="")
         raise ValueError(f"Value {value} not in select options.")
 
 
 class RheaMultiSelectParam(RheaParam):
     def __init__(
-            self, name: str, type: str, values: List[RheaSelectParam], argument: str | None = None
+        self,
+        name: str,
+        type: str,
+        values: List[RheaSelectParam],
+        argument: str | None = None,
     ) -> None:
         super().__init__(name, type, argument)
         self.values = values
@@ -363,7 +391,7 @@ class RheaMultiSelectParam(RheaParam):
         return f"RheaMultiSelectParam(name={self.name!r}, type={self.type!r}{arg}, values={vals})"
 
     __repr__ = __str__
-    
+
     @classmethod
     def from_param(cls, param: Param, value: List[str]) -> "RheaMultiSelectParam":
         if param.name is None or param.type is None:
@@ -372,7 +400,7 @@ class RheaMultiSelectParam(RheaParam):
         for val in value:
             res.append(RheaSelectParam.from_param(param, val))
         return cls(name=param.name, type=param.type, values=res)
-    
+
 
 @dataclass
 class RheaDataOutput:
@@ -394,7 +422,11 @@ class RheaDataOutput:
 
     @classmethod
     def from_file(
-        cls, filepath: str, store: Store[RedisConnector], name: Optional[str] = None, format: Optional[str] = None
+        cls,
+        filepath: str,
+        store: Store[RedisConnector],
+        name: Optional[str] = None,
+        format: Optional[str] = None,
     ) -> "RheaDataOutput":
         with open(filepath, "rb") as f:
             buffer = f.read()
@@ -403,7 +435,7 @@ class RheaDataOutput:
 
         size = os.path.getsize(filepath)
         filename = os.path.basename(filepath)
-        return cls(key=key, size=size, filename=filename, name=name, format=format) #type: ignore
+        return cls(key=key, size=size, filename=filename, name=name, format=format)  # type: ignore
 
 
 class RheaOutput:
@@ -439,7 +471,11 @@ class RheaCollectionOuput(RheaOutput):
         self.collections = collections
 
     def __str__(self) -> str:
-        files_part = f", files={self.files!r}" if getattr(self, "files", None) is not None else ""
+        files_part = (
+            f", files={self.files!r}"
+            if getattr(self, "files", None) is not None
+            else ""
+        )
         collections_repr = "[" + ", ".join(repr(c) for c in self.collections) + "]"
         return (
             f"RheaCollectionOuput(return_code={self.return_code}, "
@@ -491,4 +527,3 @@ class RheaCollectionOuput(RheaOutput):
                 raise NotImplementedError(
                     f"CollectionOutput type of {collection.type} not implemented."
                 )
-
