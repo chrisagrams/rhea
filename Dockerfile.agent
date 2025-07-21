@@ -55,7 +55,7 @@ RUN conda install -y -c conda-forge uv conda-pack \
 
 RUN uv venv --python 3.10 /home/rhea/venv \
  && . /home/rhea/venv/bin/activate \
- && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3 academy-py==0.2.0 aiofiles conda-pack
+ && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3 academy-py==0.2.0 aiofiles conda-pack zstandard
 
 COPY utils/ /home/rhea/app/utils
 COPY agent/ /home/rhea/app/agent

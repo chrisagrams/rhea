@@ -68,7 +68,9 @@ class RheaToolAgent(Agent):
         # Create coroutine to create Conda environment and install Conda packages 
         conda_coro = install_conda_env(
             env_name=self.tool.id,
-            requirements=self.tool.requirements.requirements
+            requirements=self.tool.requirements.requirements,
+            r=self.connector._redis_client,
+            target_path=f"/home/rhea/conda/envs/{self.tool.id}"
         )
         # Create coroutine to pull the tool files and configure tool directory
         dir_coro = configure_tool_directory(self.tool.id, self.minio)
@@ -258,7 +260,6 @@ class RheaToolAgent(Agent):
         input_store: Store
     ) -> None:
         # Configure parameters
-        self.logger.debug("here")
         if self.tool_directory is not None:
             env["__tool_directory__"] = self.tool_directory
         else:
@@ -275,6 +276,7 @@ class RheaToolAgent(Agent):
                         raise KeyError(
                             f"No file associated with key {param.value}"
                         )
+                    self.logger.debug(f"Wrote '{param.value}' to '{tmp_file_path}'")
                 
                 file_var = GalaxyFileVar(tmp_file_path, param.filename)
                 
