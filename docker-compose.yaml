@@ -39,19 +39,7 @@ services:
       MINIO_ROOT_USER:     admin
       MINIO_ROOT_PASSWORD: password
     command: server /data --console-address ":9001"
-  
-  squid:
-    image: ubuntu/squid:latest
-    container_name: rhea-proxy
-    ports: 
-      - "3128:3128"
-    volumes:
-      - ./squid.conf:/etc/squid/squid.conf:ro
-      - squid-cache:/var/spool/squid
-    restart: unless-stopped
 
 volumes:
   redis-data:
     name: rhea-redis-data
-  squid-cache:
-    name: rhea-squid-cache
