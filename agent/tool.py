@@ -12,7 +12,7 @@ from agent.schema import *
 from agent.utils import install_conda_env, configure_tool_directory
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
-from tempfile import TemporaryDirectory, NamedTemporaryFile, mkdtemp
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from minio import Minio
 from urllib3 import PoolManager
 from urllib3.util.retry import Retry

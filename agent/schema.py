@@ -3,7 +3,6 @@ import re
 import glob
 from typing import Any, List, Optional
 from dataclasses import dataclass
-from pathlib import Path
 from utils.schema import Param, CollectionOutput
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
