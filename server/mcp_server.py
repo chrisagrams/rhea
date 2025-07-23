@@ -5,6 +5,8 @@ import debugpy
 import logging
 import chromadb
 import anyio
+import re
+import unicodedata
 from typing import cast
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
@@ -177,6 +179,16 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
 
     return res
 
+def sanitize_tool_name(text: str, repl: str = "_") -> str:
+    if len(repl) != 1 or not re.match(r"[A-Za-z0-9_-]", repl):
+        raise ValueError("`repl` must be a single allowed character.") 
+   
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^A-Za-z0-9_-]+", repl, text)
+    text = re.sub(re.escape(repl) + r"+", repl, text)
+
+    return text.strip(repl + "-")
+
 
 @mcp.tool(name="find_tools", title="Find Tools")
 async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
@@ -279,7 +291,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
             return wrapper
 
         # Create tool.call()
-        safe_name = tool.name.lower().replace(" ", "_")  # Normalize tool name
+        safe_name = sanitize_tool_name(tool.name.lower())  # Normalize tool name
         fn = make_wrapper(tool.id, [name for name in params])
         fn.__name__ = safe_name
         fn.__doc__ = tool.description
