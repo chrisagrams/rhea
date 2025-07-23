@@ -32,7 +32,7 @@ from server.schema import (
 )
 from agent.schema import RheaParam, RheaOutput
 from manager.parsl_config import generate_parsl_config
-from parsl.errors import ConfigurationError
+from parsl.errors import ConfigurationError, NoDataFlowKernelError
 from manager.launch_agent import launch_agent
 from inspect import Signature, Parameter
 from typing import List, Optional
@@ -142,7 +142,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         if academy_client is not None:
             await academy_client.close()
         parsl.clear()
-        parsl.dfk().cleanup()
+        try:
+            parsl.dfk().cleanup()
+        except NoDataFlowKernelError:
+            pass
 
 
 mcp = FastMCP("Rhea", lifespan=app_lifespan)
@@ -219,7 +222,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
             async def wrapper(*args, **kwargs):
                 # Get context
                 ctx: Context = kwargs.pop("ctx")
-                ctx.info(f"Launching tool {tool_id}")
+                await ctx.info(f"Launching tool {tool_id}")
 
                 tool: Tool = ctx.request_context.lifespan_context.galaxy_tools[tool_id]
 
@@ -251,7 +254,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
                         ctx.request_context.lifespan_context.academy_client
                     )
 
-                    ctx.info(f"Lanched agent {handle.agent_id}")
+                    await ctx.info(f"Lanched agent {handle.agent_id}")
 
                     ctx.request_context.lifespan_context.agents[tool_id] = handle
 
@@ -260,13 +263,13 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
                     tool_id
                 ]
 
-                ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
+                await ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
                 await ctx.report_progress(0.1, 1)
 
                 # Execute tool
                 tool_result: RheaOutput = await (await handle.run_tool(rhea_params))
 
-                ctx.info(f"Tool {tool_id} finished in {handle.agent_id}")
+                await ctx.info(f"Tool {tool_id} finished in {handle.agent_id}")
                 await ctx.report_progress(1, 1)
 
                 result = MCPOutput.from_rhea(tool_result)
