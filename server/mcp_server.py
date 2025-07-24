@@ -31,7 +31,7 @@ from server.utils import create_tool
 from manager.parsl_config import generate_parsl_config
 from parsl.errors import ConfigurationError, NoDataFlowKernelError
 from manager.launch_agent import launch_agent
-from typing import List, Optional
+from typing import List, Optional, Any
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from pydantic.networks import AnyUrl
@@ -43,9 +43,9 @@ from pathlib import Path
 parser = ArgumentParser()
 parser.add_argument(
     "--transport",
-    choices=("stdio", "sse"),
+    choices=("stdio", "sse", "streamable-http"),
     default="stdio",
-    help="Transport protocol to run (stdio or sse)",
+    help="Transport protocol to run (stdio, sse, or streamable-http)",
 )
 args = parser.parse_args()
 
@@ -152,7 +152,11 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             pass
 
 
-mcp = RheaFastMCP("Rhea", lifespan=app_lifespan)
+mcp = RheaFastMCP("Rhea",
+    lifespan=app_lifespan,
+    host=settings.host,
+    port=settings.port,
+)
 
 # Manually set notification options
 lowlevel_server: Server = mcp._mcp_server
@@ -161,6 +165,13 @@ lowlevel_server: Server = mcp._mcp_server
 @mcp.tool(name="find_tools", title="Find Tools")
 async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
+
+    # Get session ID (if exists)
+    request: Any | None = ctx.request_context.request
+
+    if request is not None:
+        headers: dict = request.headers
+        session_id: str | None = headers.get("mcp-session-id")
 
     # Clear previous tools (except find_tools)
     keep = "find_tools"
@@ -268,6 +279,8 @@ async def main():
             await serve_stdio()
         case "sse":
             await serve_sse()
+        case "streamable-http":
+            await mcp.run_streamable_http_async() # TODO: Fix notification options
 
 
 if __name__ == "__main__":
