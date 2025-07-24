@@ -602,7 +602,8 @@ class Command(BaseModel):
 
 class Tool(BaseModel):
     id: str
-    name: str
+    name: str | None = None
+    user_provided_name: str
     version: str
     profile: str
     description: str
@@ -1133,7 +1134,7 @@ class Tool(BaseModel):
 
         tool = cls(
             id=tool_id,
-            name=name,
+            user_provided_name=name,
             version=version,
             profile=profile,
             description=description,

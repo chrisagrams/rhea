@@ -15,19 +15,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional, Literal
 
 
-@dataclass
-class AppContext:
-    logger: Logger
-    chroma_client: ClientAPI
-    openai_ef: OpenAIEmbeddingFunction
-    collection: Collection
-    factory: RedisExchangeFactory
-    connector: RedisConnector
-    academy_client: UserExchangeClient
-    galaxy_tools: dict[str, Tool]
-    agents: dict[str, AgentId[RheaToolAgent]]
-
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -82,6 +69,21 @@ class PBSSettings(BaseSettings):
     cpus_per_node: int = 1  # Hardware threads per node
 
 
+@dataclass
+class AppContext:
+    settings: Settings
+    logger: Logger
+    chroma_client: ClientAPI
+    openai_ef: OpenAIEmbeddingFunction
+    collection: Collection
+    factory: RedisExchangeFactory
+    connector: RedisConnector
+    academy_client: UserExchangeClient
+    galaxy_tools: dict[str, Tool]
+    galaxy_tool_lookup: dict[str, str]
+    agents: dict[str, AgentId[RheaToolAgent]]
+
+
 class MCPDataOutput(BaseModel):
     key: str
     size: int
@@ -126,7 +128,7 @@ class MCPTool(BaseModel):
     @classmethod
     def from_rhea(cls, t: Tool):
         return cls(
-            name=t.name,
+            name=t.name or "",
             description=t.description,
             long_description=t.long_description
             or "Long description not available for this tool.",
