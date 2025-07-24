@@ -7,6 +7,7 @@ from academy.identifier import AgentId
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
 from proxystore.connectors.redis import RedisConnector
+from proxystore.store import Store
 from utils.schema import Tool
 from agent.tool import RheaToolAgent
 from agent.schema import RheaDataOutput, RheaOutput
@@ -78,6 +79,7 @@ class AppContext:
     collection: Collection
     factory: RedisExchangeFactory
     connector: RedisConnector
+    output_store: Store
     academy_client: UserExchangeClient
     galaxy_tools: dict[str, Tool]
     galaxy_tool_lookup: dict[str, str]

@@ -32,7 +32,8 @@ from manager.parsl_config import generate_parsl_config
 from parsl.errors import ConfigurationError, NoDataFlowKernelError
 from manager.launch_agent import launch_agent
 from typing import List, Optional
-from proxystore.connectors.redis import RedisConnector
+from proxystore.connectors.redis import RedisKey, RedisConnector
+from proxystore.store import Store
 from pydantic.networks import AnyUrl
 from pydantic import ValidationError
 from argparse import ArgumentParser
@@ -115,6 +116,7 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
         academy_client = await factory.create_user_client(name="rhea-manager")
 
         connector = RedisConnector(settings.redis_host, settings.redis_port)
+        output_store = Store("rhea-output", connector=connector, register=True)
 
         with open(settings.pickle_file, "rb") as f:
             galaxy_tools = pickle.load(f)
@@ -131,6 +133,7 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             collection=collection,
             factory=factory,
             connector=connector,
+            output_store=output_store,
             academy_client=academy_client,
             galaxy_tools=galaxy_tools,
             galaxy_tool_lookup=galaxy_tool_lookup,

@@ -3,13 +3,16 @@ import unicodedata
 from mcp.server.fastmcp import Context
 from utils.schema import Tool, Inputs
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
-from server.schema import MCPOutput, Settings
+from mcp.server.fastmcp.resources import FunctionResource
+from server.schema import MCPOutput, MCPDataOutput, Settings
 from agent.schema import RheaParam, RheaOutput
 from proxystore.connectors.redis import RedisKey
+from proxystore.store import Store
 from typing import List
 from inspect import Signature, Parameter
 from manager.launch_agent import launch_agent
 from academy.handle import UnboundRemoteHandle, RemoteHandle
+from pydantic import AnyUrl
 
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
@@ -43,6 +46,27 @@ def sanitize_tool_name(text: str, repl: str = "_") -> str:
     text = re.sub(re.escape(repl) + r"+", repl, text)
 
     return text.strip(repl + "-")
+
+
+def create_proxystore_function_resource(file: MCPDataOutput, ctx: Context) -> FunctionResource:
+    async def _fetch() -> bytes:
+        redis_key = RedisKey(redis_key=file.key)
+        output_store: Store = ctx.request_context.lifespan_context.output_store
+
+        res = output_store.get(redis_key)
+        if res is None:
+            raise ValueError(f"Key {file.key} not in ProxyStore")
+        
+        return res
+
+    return FunctionResource(
+        uri=AnyUrl(f"proxystore://{file.key}"),
+        name=file.filename,
+        title=file.name,
+        description=f"Output file {file.filename} from tool call",
+        mime_type="text/plain",
+        fn=_fetch,
+    )
 
 
 def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
@@ -111,6 +135,16 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
             await ctx.report_progress(1, 1)
 
             result = MCPOutput.from_rhea(tool_result)
+
+            # Add ProxyStore resource 
+            if result.files is not None:
+                for file in result.files:
+                    ctx.fastmcp.add_resource(
+                        resource=create_proxystore_function_resource(file, ctx)
+                        )
+            
+            # Notify the client that we have new output resources
+            await ctx.request_context.session.send_resource_list_changed()
 
             return result
 
