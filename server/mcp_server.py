@@ -153,8 +153,6 @@ mcp = RheaFastMCP("Rhea", lifespan=app_lifespan)
 
 # Manually set notification options
 lowlevel_server: Server = mcp._mcp_server
-lowlevel_server.notification_options.resources_changed = True
-lowlevel_server.notification_options.tools_changed = True
 
 
 @mcp.tool(name="find_tools", title="Find Tools")

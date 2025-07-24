@@ -39,6 +39,8 @@ class RheaFastMCP(FastMCP):
         self._tool_manager = RheaToolManager(
             tools=tools, warn_on_duplicate_tools=self.settings.warn_on_duplicate_tools
         )
+        self._mcp_server.notification_options.resources_changed = True
+        self._mcp_server.notification_options.tools_changed = True
 
 
 class RheaToolManager(ToolManager):
