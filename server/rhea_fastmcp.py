@@ -185,7 +185,6 @@ class RheaToolManager(ToolManager):
                 tool_key = galaxy_tool_lookup[name]
                 t: GalaxyTool = galaxy_tools[tool_key]
                 tool = create_tool(t, ctx=context)
-                self._tools[tool.name] = tool
             except KeyError:
                 raise ToolError(f"Unknown tool: { name }")
         return await tool.run(arguments, context=context, convert_result=convert_result)
