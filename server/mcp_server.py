@@ -19,6 +19,7 @@ from academy.exchange.redis import RedisExchangeFactory
 from academy.logging import init_logging
 from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
+from chromadb.config import Settings as ChromaSettings
 from server.rhea_fastmcp import RheaFastMCP
 from server.client_manager import LocalClientManager
 from utils.models import Base
@@ -60,11 +61,10 @@ if Path(".env_pbs").exists():
     except ValidationError:
         pbs_settings = None
 
-logger = init_logging(logging.INFO)
 
 if settings.debug_port is not None:
     debugpy.listen(("0.0.0.0", int(settings.debug_port)))
-    logger.info(f"Waiting for VS Code to attach on port {int(settings.debug_port)}")
+    print(f"Waiting for VS Code to attach on port {int(settings.debug_port)}")
     debugpy.wait_for_client()
 
 
@@ -86,10 +86,13 @@ with open(settings.pickle_file, "rb") as f:
 @asynccontextmanager
 async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
     # Initialize on each new connection
+    logger = init_logging(logging.INFO)
+
     academy_client: Optional[UserExchangeClient] = None
     try:
         chroma_client = chromadb.HttpClient(
-            host=settings.chroma_host, port=settings.chroma_port
+            host=settings.chroma_host, port=settings.chroma_port,
+            settings=ChromaSettings(anonymized_telemetry=False)
         )
         openai_ef = embedding_functions.OpenAIEmbeddingFunction(
             api_key=settings.vllm_key,
@@ -283,7 +286,7 @@ async def main():
                 await mcp.run_streamable_http_async() # TODO: Fix notification options
     finally:
         parsl.dfk().cleanup()
-        logger.info("Application shutdown complete.")
+        print("Application shutdown complete.")
 
 
 if __name__ == "__main__":
