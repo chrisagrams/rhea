@@ -27,7 +27,6 @@ class ClientManager:
             return client_state
         except KeyError:
             return ClientState()
-    
 
     def set_client_state(
         self, 
@@ -35,8 +34,8 @@ class ClientManager:
         tools: dict[str, Tool] | None,
         resources: dict[str, Resource] | None
     ) -> None:
+        state = self.get_client_state(client_id)
         key = self._get_key(client_id)
-        state = self.get_client_state(key)
 
         if tools is not None:
             state._tools = tools
@@ -44,6 +43,10 @@ class ClientManager:
             state._resources = resources
 
         self.client_states[key] = state
+    
+    def clear_client_tools(self, client_id: str) -> None:
+        state = self.get_client_state(client_id)
+        self.set_client_state(client_id, {}, state._resources)
     
 
 class LocalClientManager(ClientManager):
@@ -70,8 +73,8 @@ class LocalClientManager(ClientManager):
             tools: dict[str, Tool] | None,
             resources: dict[str, Resource] | None
     ) -> None:
+        state = self.get_client_state(client_id)
         key = self._get_key(client_id)
-        state = self.get_client_state(key)
 
         if tools is not None:
             state._tools = tools
@@ -108,8 +111,8 @@ class RedisClientManager(ClientManager):
         tools: dict[str, Tool] | None,
         resources: dict[str, Resource] | None
     ) -> None:
+        state = self.get_client_state(client_id)
         key = self._get_key(client_id)
-        state = self.get_client_state(key)
 
         if tools is not None:
             state._tools = tools

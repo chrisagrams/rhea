@@ -21,7 +21,7 @@ from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from chromadb.config import Settings as ChromaSettings
 from server.rhea_fastmcp import RheaFastMCP
-from server.client_manager import LocalClientManager
+from server.client_manager import LocalClientManager, ClientManager
 from utils.models import Base
 from utils.schema import Tool
 from server.schema import (
@@ -158,17 +158,24 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
 
     # Get session ID (if exists)
+    session_id: str | None = None
     request: Any | None = ctx.request_context.request
 
     if request is not None:
         headers: dict = request.headers
         session_id: str | None = headers.get("mcp-session-id")
 
+    # Get ClientManager
+    client_manager: ClientManager = ctx.request_context.lifespan_context.client_manager
+
     # Clear previous tools (except find_tools)
     keep = "find_tools"
     for t in list(mcp._tool_manager._tools.keys()):
         if t != keep:
             mcp._tool_manager._tools.pop(t)
+    if session_id is not None:
+        client_manager.clear_client_tools(session_id)
+    
 
     # Clear previous tool documentations
     for r in list(mcp._resource_manager._resources.keys()):
