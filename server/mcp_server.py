@@ -4,6 +4,7 @@ import debugpy
 import logging
 import chromadb
 import anyio
+import uuid
 from typing import cast
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
@@ -19,6 +20,7 @@ from academy.logging import init_logging
 from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddable
 from server.rhea_fastmcp import RheaFastMCP
+from server.client_manager import LocalClientManager
 from utils.models import Base
 from utils.schema import Tool
 from server.schema import (
@@ -58,39 +60,34 @@ if Path(".env_pbs").exists():
     except ValidationError:
         pbs_settings = None
 
+logger = init_logging(logging.INFO)
 
 if settings.debug_port is not None:
     debugpy.listen(("0.0.0.0", int(settings.debug_port)))
-    print(f"Waiting for VS Code to attach on port {int(settings.debug_port)}")
+    logger.info(f"Waiting for VS Code to attach on port {int(settings.debug_port)}")
     debugpy.wait_for_client()
+
+
+connector = RedisConnector(settings.redis_host, settings.redis_port)
+output_store = Store("rhea-output", connector=connector, register=True)
+
+client_manager = LocalClientManager(client_ttl=settings.client_ttl)
+
+factory = RedisExchangeFactory(settings.redis_host, settings.redis_port)
+
+with open(settings.pickle_file, "rb") as f:
+    galaxy_tools = pickle.load(f)
+
+    galaxy_tool_lookup = {}
+    for tool_id, tool in galaxy_tools.items():
+        galaxy_tool_lookup[tool.name] = tool_id
 
 
 @asynccontextmanager
 async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
-    logger = init_logging(logging.INFO)
+    # Initialize on each new connection
     academy_client: Optional[UserExchangeClient] = None
-
     try:
-        # Prevent double-loading DFK
-        try:
-            parsl.load(
-                generate_parsl_config(
-                    backend=settings.parsl_container_backend,
-                    network=settings.parsl_container_network,
-                    provider=settings.parsl_provider,
-                    max_workers_per_node=settings.parsl_max_workers_per_node,
-                    init_blocks=settings.parsl_init_blocks,
-                    min_blocks=settings.parsl_min_blocks,
-                    max_blocks=settings.parsl_max_blocks,
-                    nodes_per_block=settings.parsl_nodes_per_block,
-                    parallelism=settings.parsl_parallelism,
-                    debug=settings.parsl_container_debug,
-                    pbs_settings=pbs_settings,
-                )
-            )
-        except ConfigurationError:
-            pass
-
         chroma_client = chromadb.HttpClient(
             host=settings.chroma_host, port=settings.chroma_port
         )
@@ -112,18 +109,7 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
                 "CHROMA_COLLECTION must be set (got None); cannot initialize ChromaDB collection"
             )
 
-        factory = RedisExchangeFactory(settings.redis_host, settings.redis_port)
-        academy_client = await factory.create_user_client(name="rhea-manager")
-
-        connector = RedisConnector(settings.redis_host, settings.redis_port)
-        output_store = Store("rhea-output", connector=connector, register=True)
-
-        with open(settings.pickle_file, "rb") as f:
-            galaxy_tools = pickle.load(f)
-
-            galaxy_tool_lookup = {}
-            for tool_id, tool in galaxy_tools.items():
-                galaxy_tool_lookup[tool.name] = tool_id
+        academy_client = await factory.create_user_client(name=f"rhea-manager-{str(uuid.uuid4())}")
 
         yield AppContext(
             settings=settings,
@@ -138,18 +124,15 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             galaxy_tools=galaxy_tools,
             galaxy_tool_lookup=galaxy_tool_lookup,
             agents={},
+            client_manager=client_manager
         )
+        
     except Exception as e:
         logger.error(e)
 
     finally:  # Application shutdown
         if academy_client is not None:
             await academy_client.close()
-        parsl.clear()
-        try:
-            parsl.dfk().cleanup()
-        except NoDataFlowKernelError:
-            pass
 
 
 mcp = RheaFastMCP("Rhea",
@@ -202,7 +185,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
             continue
 
         # Add tool to MCP server
-        mcp.add_tool(
+        mcp.add_tool_to_context(
             fn=tool_function.fn,
             name=tool_function.name,
             title=tool_function.title,
@@ -274,13 +257,33 @@ async def serve_sse():
 
 
 async def main():
-    match args.transport:
-        case "stdio":
-            await serve_stdio()
-        case "sse":
-            await serve_sse()
-        case "streamable-http":
-            await mcp.run_streamable_http_async() # TODO: Fix notification options
+    try:
+        parsl.load(
+            generate_parsl_config(
+                backend=settings.parsl_container_backend,
+                network=settings.parsl_container_network,
+                provider=settings.parsl_provider,
+                max_workers_per_node=settings.parsl_max_workers_per_node,
+                init_blocks=settings.parsl_init_blocks,
+                min_blocks=settings.parsl_min_blocks,
+                max_blocks=settings.parsl_max_blocks,
+                nodes_per_block=settings.parsl_nodes_per_block,
+                parallelism=settings.parsl_parallelism,
+                debug=settings.parsl_container_debug,
+                pbs_settings=pbs_settings,
+            )
+        )
+
+        match args.transport:
+            case "stdio":
+                await serve_stdio()
+            case "sse":
+                await serve_sse()
+            case "streamable-http":
+                await mcp.run_streamable_http_async() # TODO: Fix notification options
+    finally:
+        parsl.dfk().cleanup()
+        logger.info("Application shutdown complete.")
 
 
 if __name__ == "__main__":

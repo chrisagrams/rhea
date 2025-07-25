@@ -14,7 +14,7 @@ from agent.schema import RheaDataOutput, RheaOutput
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional, Literal
-
+from server.client_manager import ClientManager
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     port: int = 3001
     debug_port: int | None = None
     pickle_file: str = "tools_dict.pkl"
+
+    # Client state configuration
+    client_ttl: int = 3600
 
     # Parsl configuration
     parsl_container_backend: Literal["docker", "podman"] = "docker"
@@ -84,6 +87,7 @@ class AppContext:
     galaxy_tools: dict[str, Tool]
     galaxy_tool_lookup: dict[str, str]
     agents: dict[str, AgentId[RheaToolAgent]]
+    client_manager: ClientManager
 
 
 class MCPDataOutput(BaseModel):
