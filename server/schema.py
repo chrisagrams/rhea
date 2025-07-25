@@ -88,6 +88,7 @@ class AppContext:
     galaxy_tool_lookup: dict[str, str]
     agents: dict[str, AgentId[RheaToolAgent]]
     client_manager: ClientManager
+    run_id: str
 
 
 class MCPDataOutput(BaseModel):

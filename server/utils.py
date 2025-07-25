@@ -1,5 +1,8 @@
 import re
 import unicodedata
+import pickle
+import asyncio
+import time
 from mcp.server.fastmcp import Context
 from utils.schema import Tool, Inputs
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
@@ -13,6 +16,7 @@ from inspect import Signature, Parameter
 from manager.launch_agent import launch_agent
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from pydantic import AnyUrl
+from redis import Redis
 
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
@@ -69,6 +73,19 @@ def create_proxystore_function_resource(file: MCPDataOutput, ctx: Context) -> Fu
     )
 
 
+async def get_handle_from_redis(tool_id: str, run_id: str, r: Redis, timeout: float = 30.0) -> UnboundRemoteHandle | None:
+    interval = 0.1
+    deadline = time.time() + timeout
+    while True:
+        data = r.get(f"agent_handle:{run_id}-{tool_id}")
+        if data is not None:
+            result: UnboundRemoteHandle = pickle.loads(data) # type: ignore
+            return result
+        if time.time() > deadline:
+            return None
+        await asyncio.sleep(interval)
+
+
 def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
     params: List[Parameter] = construct_params(tool.inputs)
 
@@ -85,6 +102,14 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
             ctx: Context = kwargs.pop("ctx")
             await ctx.info(f"Launching tool {tool_id}")
 
+            # Get settings from app context
+            settings: Settings = ctx.request_context.lifespan_context.settings
+
+            # Configure Redis client to get handle
+            r = Redis(settings.redis_host, settings.redis_port)
+
+            run_id = ctx.request_context.lifespan_context.run_id
+
             tool: Tool = ctx.request_context.lifespan_context.galaxy_tools[tool_id]
 
             await ctx.report_progress(0, 1)
@@ -98,29 +123,41 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
             await ctx.report_progress(0.05, 1)
 
             if tool_id not in ctx.request_context.lifespan_context.agents:
-                # Get settings from app context
-                settings: Settings = ctx.request_context.lifespan_context.settings
+                # First, quickly check if the agent exists in other contexts
+                unbound_handle: UnboundRemoteHandle | None = await get_handle_from_redis(tool.id, run_id, r, timeout=1)
 
-                # Launch agent
-                future_handle = launch_agent(
-                    tool,
-                    redis_host=settings.agent_redis_host,
-                    redis_port=settings.agent_redis_port,
-                    minio_endpoint=settings.minio_endpoint,
-                    minio_access_key=settings.minio_access_key,
-                    minio_secret_key=settings.minio_secret_key,
-                    minio_secure=False,
-                )
+                # Another context already initialized this tool, bind it to this Academy client:
+                if unbound_handle is not None:
+                    handle: RemoteHandle = unbound_handle.bind_to_client(
+                        ctx.request_context.lifespan_context.academy_client
+                    )
+                    ctx.request_context.lifespan_context.agents[tool_id] = handle
 
-                unbound_handle: UnboundRemoteHandle = future_handle.result()
+                else:
+                    # Launch agent
+                    launch_agent(
+                        tool,
+                        run_id=run_id,
+                        redis_host=settings.agent_redis_host,
+                        redis_port=settings.agent_redis_port,
+                        minio_endpoint=settings.minio_endpoint,
+                        minio_access_key=settings.minio_access_key,
+                        minio_secret_key=settings.minio_secret_key,
+                        minio_secure=False,
+                    )
 
-                handle: RemoteHandle = unbound_handle.bind_to_client(
-                    ctx.request_context.lifespan_context.academy_client
-                )
+                    unbound_handle: UnboundRemoteHandle | None = await get_handle_from_redis(tool.id, run_id, r, timeout=30)
 
-                await ctx.info(f"Lanched agent {handle.agent_id}")
+                    if unbound_handle is None:
+                        raise RuntimeError("Never received handle from Parsl worker.")
 
-                ctx.request_context.lifespan_context.agents[tool_id] = handle
+                    handle: RemoteHandle = unbound_handle.bind_to_client(
+                        ctx.request_context.lifespan_context.academy_client
+                    )
+
+                    await ctx.info(f"Lanched agent {handle.agent_id}")
+
+                    ctx.request_context.lifespan_context.agents[tool_id] = handle
 
             # Get handle from dictionary
             handle: RemoteHandle = ctx.request_context.lifespan_context.agents[tool_id]

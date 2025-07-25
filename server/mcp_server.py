@@ -68,6 +68,10 @@ if settings.debug_port is not None:
     debugpy.wait_for_client()
 
 
+# A 'run_id', generated on the begining of application startup, to keep track of which handles are stale
+run_id = str(uuid.uuid4()) 
+
+
 connector = RedisConnector(settings.redis_host, settings.redis_port)
 output_store = Store("rhea-output", connector=connector, register=True)
 
@@ -127,7 +131,8 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             galaxy_tools=galaxy_tools,
             galaxy_tool_lookup=galaxy_tool_lookup,
             agents={},
-            client_manager=client_manager
+            client_manager=client_manager,
+            run_id=run_id
         )
         
     except Exception as e:
