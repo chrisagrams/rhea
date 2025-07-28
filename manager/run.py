@@ -1,4 +1,4 @@
-import os
+import uuid
 import asyncio
 from academy.logging import init_logging
 from academy.exchange.redis import RedisExchangeFactory
@@ -6,6 +6,7 @@ from academy.handle import UnboundRemoteHandle, RemoteHandle
 from agent.schema import RheaParam
 from manager.parsl_config import generate_parsl_config
 from manager.launch_agent import launch_agent
+from manager.utils import get_handle_from_redis
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
@@ -13,6 +14,7 @@ import pickle
 import logging
 import parsl
 from minio import Minio
+from redis import Redis
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,8 +47,13 @@ async def main():
                 factory = RedisExchangeFactory("localhost", 6379)
                 client = await factory.create_user_client(name="rhea-manager")
 
-                future_handle = launch_agent(
+                r = Redis('localhost', 6379)
+
+                run_id = f"tool-tests-{str(uuid.uuid4())}"
+
+                launch_agent(
                     tool,
+                    run_id,
                     redis_host="host.docker.internal",
                     redis_port=6379,
                     minio_endpoint="host.docker.internal:9000",
@@ -55,9 +62,14 @@ async def main():
                     minio_secure=False,
                 )
 
-                unbound_handle: UnboundRemoteHandle = future_handle.result()
+                unbound_handle: UnboundRemoteHandle | None = (
+                    await get_handle_from_redis(tool.id, run_id, r, timeout=30)
+                )
 
+                if unbound_handle is None:
+                    raise RuntimeError("Never received handle from Parsl worker.")
                 handle: RemoteHandle = unbound_handle.bind_to_client(client)
+                
 
                 packages = await (await handle.get_installed_packages())
 

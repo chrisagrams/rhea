@@ -9,6 +9,7 @@ from mcp.server.fastmcp.tools import Tool as FastMCPTool
 from mcp.server.fastmcp.resources import FunctionResource
 from server.schema import MCPOutput, MCPDataOutput, Settings
 from agent.schema import RheaParam, RheaOutput
+from manager.utils import get_handle_from_redis
 from proxystore.connectors.redis import RedisKey
 from proxystore.store import Store
 from typing import List
@@ -73,21 +74,6 @@ def create_proxystore_function_resource(
         mime_type="text/plain",
         fn=_fetch,
     )
-
-
-async def get_handle_from_redis(
-    tool_id: str, run_id: str, r: Redis, timeout: float = 30.0
-) -> UnboundRemoteHandle | None:
-    interval = 0.1
-    deadline = time.time() + timeout
-    while True:
-        data = r.get(f"agent_handle:{run_id}-{tool_id}")
-        if data is not None:
-            result: UnboundRemoteHandle = pickle.loads(data)  # type: ignore
-            return result
-        if time.time() > deadline:
-            return None
-        await asyncio.sleep(interval)
 
 
 def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:

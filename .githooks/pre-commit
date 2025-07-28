@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Formatting with Black..."
+black .
+
+echo "Type-checking with Pyright ..."
+uv run pyright --warnings

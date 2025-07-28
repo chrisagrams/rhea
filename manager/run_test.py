@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from academy.exchange.redis import RedisExchangeFactory
 from academy.logging import init_logging
 from academy.handle import UnboundRemoteHandle, RemoteHandle
@@ -6,6 +7,7 @@ from utils.schema import Tool, Param, Tests, Test, Conditional
 from utils.process import process_inputs, process_outputs
 from manager.parsl_config import generate_parsl_config
 from manager.launch_agent import launch_agent
+from manager.utils import get_handle_from_redis
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
@@ -14,6 +16,7 @@ import pickle
 import logging
 import parsl
 from minio import Minio
+from redis import Redis
 
 minio_bucket = "dev"
 
@@ -27,6 +30,8 @@ minio_client = Minio(
 connector = RedisConnector("localhost", 6379)
 factory = RedisExchangeFactory("localhost", 6379)
 
+r = Redis('localhost', 6379)
+
 
 async def run_tool_tests(tool: Tool) -> List[bool]:
 
@@ -35,9 +40,11 @@ async def run_tool_tests(tool: Tool) -> List[bool]:
 
     test_results = []
 
+    run_id = f"tool-tests-{str(uuid.uuid4())}"
     # Register and start agent
-    future_handle = launch_agent(
+    launch_agent(
         tool,
+        run_id,
         redis_host="host.docker.internal",
         redis_port=6379,
         minio_endpoint="host.docker.internal:9000",
@@ -46,7 +53,12 @@ async def run_tool_tests(tool: Tool) -> List[bool]:
         minio_secure=False,
     )
 
-    unbound_handle: UnboundRemoteHandle = future_handle.result()
+    unbound_handle: UnboundRemoteHandle | None = (
+        await get_handle_from_redis(tool.id, run_id, r, timeout=30)
+    )
+
+    if unbound_handle is None:
+        raise RuntimeError("Never received handle from Parsl worker.")
 
     handle: RemoteHandle = unbound_handle.bind_to_client(client)
 

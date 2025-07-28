@@ -72,8 +72,9 @@ def sample_tool(tools):
 
 
 ignore_codes = [
-    2164, #Use 'cd ... || exit' or 'cd ... || return' in case cd fails.
+    2164,  # Use 'cd ... || exit' or 'cd ... || return' in case cd fails.
 ]
+
 
 def shellcheck_lint(script: str, env: dict[str, str]) -> List[Dict[str, Any]]:
     header_lines = []
@@ -133,7 +134,9 @@ def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
         Store("rhea-test-output", connector, register=True) as output_store,
     ):
         env = os.environ.copy()
-        agent.build_env_parameters(env, params, sample_tool.inputs.params, "/tmp", input_store)
+        agent.build_env_parameters(
+            env, params, sample_tool.inputs.params, "/tmp", input_store
+        )
         agent.build_output_env_parameters(env, "/tmp")
         if sample_tool.configfiles is not None:
             if sample_tool.configfiles.configfiles is not None:
@@ -151,7 +154,7 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
     if len(sample_tool.tests.tests) == 0:
         assert True
         return
-    
+
     try:
         params = process_inputs(
             agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
@@ -161,7 +164,9 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
             Store("rhea-test-output", connector, register=True) as output_store,
         ):
             env = os.environ.copy()
-            agent.build_env_parameters(env, params, sample_tool.inputs.params, "/tmp", input_store)
+            agent.build_env_parameters(
+                env, params, sample_tool.inputs.params, "/tmp", input_store
+            )
             agent.build_output_env_parameters(env, "/tmp")
             if sample_tool.configfiles is not None:
                 if sample_tool.configfiles.configfiles is not None:
@@ -169,7 +174,7 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
                         agent.build_configfile(env, configfile)
             cmd = agent.apply_interpreter_command()
             cmd = agent.expand_galaxy_if(cmd, env)
-            cmd = cmd.replace('\n', ' ')
+            cmd = cmd.replace("\n", " ")
             cmd = agent.unescape_bash_vars(cmd)
             cmd = agent.fix_var_quotes(cmd)
             cmd = agent.quote_shell_params(cmd)
@@ -197,10 +202,8 @@ def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
         except Exception:
             failed.append(tool_id)
         count += 1
-        if count == limit: 
+        if count == limit:
             break
     total = len(passed) + len(failed)
     num_passed = len(passed)
-    assert not failed, (
-        f"{num_passed}/{total} passed; failures: {failed[0:10]}..."
-    )
+    assert not failed, f"{num_passed}/{total} passed; failures: {failed[0:10]}..."

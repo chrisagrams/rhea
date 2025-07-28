@@ -125,6 +125,7 @@ class ConfigFile(BaseModel):
 class ConfigFiles(BaseModel):
     configfiles: Optional[List[ConfigFile]] = None
 
+
 class Xref(BaseModel):
     type: str
     value: str
@@ -257,17 +258,18 @@ class Param(BaseModel):
     falsevalue: Optional[str] = None
     checked: Optional[bool] = None
     options: Optional[List[Option]] = None
-    description: Optional[str] = None # An LLM-generated description of the Parameter
-
+    description: Optional[str] = None  # An LLM-generated description of the Parameter
 
     def to_python_parameter(self) -> Parameter:
         if (self.name is None or self.name == "") and self.argument is not None:
             self.name = self.argument.replace("--", "")
         if self.name is None:
             raise ValueError("Both parameter name and argument is None.")
-        if self.name.startswith("-"): # Python parameters can't start with a hyphen 
-            self.name = self.name.lstrip("-") # TODO: Make sure this doesn't break downstream
-        
+        if self.name.startswith("-"):  # Python parameters can't start with a hyphen
+            self.name = self.name.lstrip(
+                "-"
+            )  # TODO: Make sure this doesn't break downstream
+
         if self.type == "boolean":
             annotation = Optional[bool] if self.optional else bool
         else:
@@ -276,9 +278,7 @@ class Param(BaseModel):
         return Parameter(
             name=self.name,
             kind=Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=Annotated[
-                annotation, Field(description=self.description)
-            ]
+            annotation=Annotated[annotation, Field(description=self.description)],
         )
 
 
@@ -431,7 +431,7 @@ class AssertContents(BaseModel):
         subject = input.decode(encoding="utf-8")
         if text not in subject:
             raise AssertionError(f"Expected to find '{text}' in subject")
-        
+
     def _assert_has_text_matching(
         self,
         input: bytes,
@@ -520,7 +520,7 @@ class AssertContents(BaseModel):
         count = sum(1 for line in lines if pattern.search(line))
 
         expected = int(n) if n is not None and n != "" else 1
-        
+
         d = int(delta) if delta not in (None, "") else 0
         lower = expected - d
         upper = expected + d
@@ -718,7 +718,7 @@ class Tool(BaseModel):
             version_command = ""
 
         # Command
-        
+
         cmd_el = root.find("command")
         if cmd_el is not None:
             command_string = cmd_el.text or ""
@@ -739,7 +739,6 @@ class Tool(BaseModel):
                         ConfigFile(name=cf_el.get("name") or "", text=cf_el.text or "")
                     )
                 config_files = ConfigFiles(configfiles=configfiles)
-            
 
         # Inputs
         inputs_el = root.find("inputs")
@@ -748,7 +747,9 @@ class Tool(BaseModel):
             opts = [
                 Option(
                     value=o.get("value") or "",
-                    selected=(o.get("selected") == "True" or o.get("selected") == "true"),
+                    selected=(
+                        o.get("selected") == "True" or o.get("selected") == "true"
+                    ),
                     text=o.text,
                 )
                 for o in el.findall("option")
@@ -804,17 +805,16 @@ class Tool(BaseModel):
             sec = Section(
                 name=sec_el.get("name") or "",
                 title=sec_el.get("title") or "",
-                expanded=(sec_el.get("expanded") == "True" or sec_el.get("expanded") == "true"),
+                expanded=(
+                    sec_el.get("expanded") == "True" or sec_el.get("expanded") == "true"
+                ),
                 help=sec_el.get("help"),
-                params=section_params
+                params=section_params,
             )
             sections.append(sec)
 
-
         inputs = Inputs(
-            params=params,
-            conditionals=conditionals or None,
-            sections=sections
+            params=params, conditionals=conditionals or None, sections=sections
         )
 
         # Outputs

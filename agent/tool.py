@@ -65,9 +65,7 @@ class RheaToolAgent(Agent):
 
     async def agent_on_startup(self) -> None:
         # Initialize ProxyStore
-        self.input_store = Store(
-            "rhea-input", connector=self.connector, register=True
-        )
+        self.input_store = Store("rhea-input", connector=self.connector, register=True)
         self.output_store = Store(
             "rhea-output", connector=self.connector, register=True
         )
