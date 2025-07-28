@@ -47,7 +47,7 @@ async def main():
                 factory = RedisExchangeFactory("localhost", 6379)
                 client = await factory.create_user_client(name="rhea-manager")
 
-                r = Redis('localhost', 6379)
+                r = Redis("localhost", 6379)
 
                 run_id = f"tool-tests-{str(uuid.uuid4())}"
 
@@ -69,7 +69,6 @@ async def main():
                 if unbound_handle is None:
                     raise RuntimeError("Never received handle from Parsl worker.")
                 handle: RemoteHandle = unbound_handle.bind_to_client(client)
-                
 
                 packages = await (await handle.get_installed_packages())
 

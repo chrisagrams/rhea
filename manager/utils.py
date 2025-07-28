@@ -3,6 +3,7 @@ import asyncio
 from redis import Redis
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 
+
 async def get_handle_from_redis(
     tool_id: str, run_id: str, r: Redis, timeout: float = 30.0
 ) -> UnboundRemoteHandle | None:

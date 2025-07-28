@@ -30,7 +30,7 @@ minio_client = Minio(
 connector = RedisConnector("localhost", 6379)
 factory = RedisExchangeFactory("localhost", 6379)
 
-r = Redis('localhost', 6379)
+r = Redis("localhost", 6379)
 
 
 async def run_tool_tests(tool: Tool) -> List[bool]:
@@ -53,8 +53,8 @@ async def run_tool_tests(tool: Tool) -> List[bool]:
         minio_secure=False,
     )
 
-    unbound_handle: UnboundRemoteHandle | None = (
-        await get_handle_from_redis(tool.id, run_id, r, timeout=30)
+    unbound_handle: UnboundRemoteHandle | None = await get_handle_from_redis(
+        tool.id, run_id, r, timeout=30
     )
 
     if unbound_handle is None:
