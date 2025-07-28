@@ -29,7 +29,7 @@ services:
   
   minio:
     image: minio/minio:latest
-    container_name: minio
+    container_name: rhea-minio
     volumes:
       - ./data/minio:/data
     ports:
@@ -40,6 +40,32 @@ services:
       MINIO_ROOT_PASSWORD: password
     command: server /data --console-address ":9001"
 
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    container_name: rhea-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rhea
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:1.7
+    restart: unless-stopped
+    volumes:
+      - text-embeddings-data:/data
+    ports:
+      - "8000:80"
+    command: ["--model-id", "Qwen/Qwen3-Embedding-0.6B"]
+
 volumes:
   redis-data:
     name: rhea-redis-data
+  postgres-data:
+    name: rhea-postgres-data
+  text-embeddings-data:
+    name: rhea-text-embeddings-data

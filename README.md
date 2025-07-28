@@ -19,7 +19,7 @@ When a tool is called, the server utilizes Parsl to spawn an Academy agent that 
 - `uv` - Package manager for Python projects.
 - `docker` - To run tools locally (external executor comming soon!)
 
-Additionally, the server will need to point to an existing OpenAI-like endpoint (for embedding), ChromaDB, Redis, and MinIO server. Documentation coming soon.
+Additionally, the server will need to point to an existing OpenAI-like endpoint (for embedding), Postgres, Redis, and MinIO server. Documentation coming soon.
 
 ### Instalation
 After cloning the repository, use `uv` to configure the virtual environment. 

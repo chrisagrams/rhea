@@ -1,55 +1,57 @@
-from sqlalchemy import (
-    create_engine,
-    Column,
-    String,
-    Boolean,
-    Integer,
-    Table,
-    DateTime,
-    ForeignKey,
-    Text,
-)
+from sqlalchemy import Column, String, Index, Text, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from pgvector.sqlalchemy import Vector
+from utils.schema import Tool
 
 Base = declarative_base()
 
-tool_category = Table(
-    "tool_category",
-    Base.metadata,
-    Column("tool_id", String, ForeignKey("tools.id"), primary_key=True),
-    Column("category_id", String, ForeignKey("categories.id"), primary_key=True),
-)
 
-
-class Category(Base):
-    __tablename__ = "categories"
+class GalaxyTool(Base):
+    __tablename__ = "galaxytools"
+    __table_args__ = (
+        Index(
+            "ix_galaxytools_embedding",
+            "embedding",
+            postgresql_using="ivfflat",
+            postgresql_ops={"embedding": "vector_l2_ops"},
+        ),
+    )
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
-    description = Column(Text)
-    deleted = Column(Boolean, default=False)
-    url = Column(String)
-    repositories = Column(Integer)
-    tools = relationship("Tool", secondary=tool_category, back_populates="categories")
-
-
-class Tool(Base):
-    __tablename__ = "tools"
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
-    type = Column(String)
-    remote_repository_url = Column(String)
-    homepage_url = Column(String)
+    user_provided_name = Column(String)
     description = Column(Text)
     long_description = Column(Text)
-    user_id = Column(String)
-    private = Column(Boolean, default=False)
-    deleted = Column(Boolean, default=False)
-    times_downloaded = Column(Integer, default=0)
-    deprecated = Column(Boolean, default=False)
-    create_time = Column(DateTime, default=datetime.utcnow)
-    owner = Column(String)
-    categories = relationship(
-        "Category", secondary=tool_category, back_populates="tools"
-    )
+    documentation = Column(Text)
+    _definition = Column("definition", JSONB, nullable=False)
+    embedding = Column(Vector(1024), nullable=False)
+
+    @property
+    def definition(self) -> Tool:
+        return Tool.model_validate(self._definition)
+
+    @definition.setter
+    def definition(self, t: Tool | dict):
+        if isinstance(t, Tool):
+            self._definition = t.model_dump()
+        else:
+            self._definition = Tool.model_validate(t).model_dump()
+
+
+async def get_galaxytool_by_id(session: AsyncSession, tool_id: str) -> Tool | None:
+    statement = select(GalaxyTool).where(GalaxyTool.id == tool_id)
+    result = await session.execute(statement)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return row
+    return row.definition
+
+
+async def get_galaxytool_by_name(session: AsyncSession, tool_name: str) -> Tool | None:
+    statement = select(GalaxyTool).where(GalaxyTool.name == tool_name)
+    result = await session.execute(statement)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return row
+    return row.definition

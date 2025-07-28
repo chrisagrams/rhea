@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from logging import Logger
-from chromadb.api import ClientAPI
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-from chromadb.api.models.Collection import Collection
+from openai import OpenAI
 from academy.identifier import AgentId
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
@@ -13,6 +11,7 @@ from agent.tool import RheaToolAgent
 from agent.schema import RheaDataOutput, RheaOutput
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from typing import List, Optional, Literal
 from server.client_manager import ClientManager
 
@@ -23,7 +22,9 @@ class Settings(BaseSettings):
     host: str = "localhost"
     port: int = 3001
     debug_port: int | None = None
-    pickle_file: str = "tools_dict.pkl"
+
+    # SQLAlchemy database url
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/rhea"
 
     # Client state configuration
     client_ttl: int = 3600
@@ -43,13 +44,9 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
-    vllm_url: str = "http://localhost:8000/v1"
-    vllm_key: str = ""
+    embedding_url: str = "http://localhost:8000/v1"
+    embedding_key: str = ""
     model: str = "Qwen/Qwen3-Embedding-0.6B"
-
-    chroma_host: str = "localhost"
-    chroma_port: int = 8001
-    chroma_collection: str | None = None
 
     # Agent configuration
     # Agent may be executing on different host than MCP server.
@@ -78,15 +75,12 @@ class PBSSettings(BaseSettings):
 class AppContext:
     settings: Settings
     logger: Logger
-    chroma_client: ClientAPI
-    openai_ef: OpenAIEmbeddingFunction
-    collection: Collection
+    embedding_client: OpenAI
+    db_session: AsyncSession
     factory: RedisExchangeFactory
     connector: RedisConnector
     output_store: Store
     academy_client: UserExchangeClient
-    galaxy_tools: dict[str, Tool]
-    galaxy_tool_lookup: dict[str, str]
     agents: dict[str, AgentId[RheaToolAgent]]
     client_manager: ClientManager
     run_id: str
