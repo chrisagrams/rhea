@@ -39,14 +39,6 @@ Base.metadata.create_all(engine)
 client = OpenAI(base_url=args.embedding_url, api_key=args.api_key)
 
 
-def get_embedding(input_text: str) -> List[float]:
-    response = client.embeddings.create(
-        model=args.model, input=input_text, encoding_format="float"
-    )
-    embedding: List[float] = response.data[0].embedding
-    return embedding
-
-
 if __name__ == "__main__":
     with open(args.pickle_file, "rb") as f:
         tools: dict[str, Tool] = pickle.load(f)
