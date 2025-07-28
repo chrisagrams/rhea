@@ -41,7 +41,7 @@ services:
     command: server /data --console-address ":9001"
 
   postgres:
-    image: postgres:17
+    image: pgvector/pgvector:0.8.0-pg17
     container_name: rhea-postgres
     restart: unless-stopped
     environment:
@@ -53,8 +53,19 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  embedding:
+    image: ${EMBEDDING_IMAGE}
+    restart: unless-stopped
+    volumes:
+      - text-embeddings-data:/data
+    ports:
+      - "8000:80"
+    command: ["--model-id", "Qwen/Qwen3-Embedding-0.6B"]
+
 volumes:
   redis-data:
     name: rhea-redis-data
   postgres-data:
     name: rhea-postgres-data
+  text-embeddings-data:
+    name: rhea-text-embeddings-data
