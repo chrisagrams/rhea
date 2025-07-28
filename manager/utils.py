@@ -1,3 +1,4 @@
+import pickle
 import time
 import asyncio
 from redis import Redis

@@ -1,11 +1,7 @@
-from sqlalchemy import (
-    Column,
-    String,
-    Index,
-    Text,
-)
+from sqlalchemy import Column, String, Index, Text, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.asyncio import AsyncSession
 from pgvector.sqlalchemy import Vector
 from utils.schema import Tool
 
@@ -41,3 +37,21 @@ class GalaxyTool(Base):
             self._definition = t.model_dump()
         else:
             self._definition = Tool.model_validate(t).model_dump()
+
+
+async def get_galaxytool_by_id(session: AsyncSession, tool_id: str) -> Tool | None:
+    statement = select(GalaxyTool).where(GalaxyTool.id == tool_id)
+    result = await session.execute(statement)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return row
+    return row.definition
+
+
+async def get_galaxytool_by_name(session: AsyncSession, tool_name: str) -> Tool | None:
+    statement = select(GalaxyTool).where(GalaxyTool.name == tool_name)
+    result = await session.execute(statement)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return row
+    return row.definition

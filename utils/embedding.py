@@ -1,6 +1,9 @@
 from openai import OpenAI
 from typing import List
 from utils.schema import Tool
+from utils.models import GalaxyTool
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 template = """# {name}
 
@@ -40,3 +43,16 @@ def generate_tool_documentation_embedding(
         client=client,
         model=model,
     )
+
+
+async def get_l2_distance(
+    query_vec: List[float], session: AsyncSession, limit: int = 10
+) -> List[Tool]:
+    dist_col = GalaxyTool.embedding.l2_distance(query_vec).label("distance")
+
+    result = await session.execute(
+        (select(GalaxyTool, dist_col).order_by(dist_col).limit(limit))
+    )
+
+    rows = result.all()
+    return [orm_obj.definition for orm_obj, _dist in rows]

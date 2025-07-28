@@ -54,7 +54,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   embedding:
-    image: ${EMBEDDING_IMAGE}
+    image: ghcr.io/huggingface/text-embeddings-inference:1.7
     restart: unless-stopped
     volumes:
       - text-embeddings-data:/data

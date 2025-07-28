@@ -1,11 +1,8 @@
 import parsl
-import pickle
 import debugpy
 import logging
-import chromadb
 import anyio
 import uuid
-from typing import cast
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import Context
@@ -17,12 +14,9 @@ from mcp.server.fastmcp.tools import Tool as FastMCPTool
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
 from academy.logging import init_logging
-from chromadb.utils import embedding_functions
-from chromadb.api.types import EmbeddingFunction, Embeddable
-from chromadb.config import Settings as ChromaSettings
+from openai import OpenAI
 from server.rhea_fastmcp import RheaFastMCP
 from server.client_manager import LocalClientManager, ClientManager
-from utils.models import Base
 from utils.schema import Tool
 from server.schema import (
     AppContext,
@@ -30,12 +24,17 @@ from server.schema import (
     Settings,
     PBSSettings,
 )
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    AsyncEngine,
+    create_async_engine,
+    async_sessionmaker,
+)
 from server.utils import create_tool
+from utils.embedding import get_embedding, get_l2_distance
 from manager.parsl_config import generate_parsl_config
-from parsl.errors import ConfigurationError, NoDataFlowKernelError
-from manager.launch_agent import launch_agent
 from typing import List, Optional, Any
-from proxystore.connectors.redis import RedisKey, RedisConnector
+from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from pydantic.networks import AnyUrl
 from pydantic import ValidationError
@@ -71,7 +70,6 @@ if settings.debug_port is not None:
 # A 'run_id', generated on the begining of application startup, to keep track of which handles are stale
 run_id = str(uuid.uuid4())
 
-
 connector = RedisConnector(settings.redis_host, settings.redis_port)
 output_store = Store("rhea-output", connector=connector, register=True)
 
@@ -79,12 +77,15 @@ client_manager = LocalClientManager(client_ttl=settings.client_ttl)
 
 factory = RedisExchangeFactory(settings.redis_host, settings.redis_port)
 
-with open(settings.pickle_file, "rb") as f:
-    galaxy_tools = pickle.load(f)
-
-    galaxy_tool_lookup = {}
-    for tool_id, tool in galaxy_tools.items():
-        galaxy_tool_lookup[tool.name] = tool_id
+engine: AsyncEngine = create_async_engine(
+    settings.database_url, echo=False, future=True
+)
+AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
 
 
 @asynccontextmanager
@@ -94,45 +95,25 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
 
     academy_client: Optional[UserExchangeClient] = None
     try:
-        chroma_client = chromadb.HttpClient(
-            host=settings.chroma_host,
-            port=settings.chroma_port,
-            settings=ChromaSettings(anonymized_telemetry=False),
+        embedding_client = OpenAI(
+            base_url=settings.embedding_url, api_key=settings.embedding_key
         )
-        openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=settings.vllm_key,
-            api_base=settings.vllm_url,
-            model_name=settings.model,
-        )
-
-        ef = cast(EmbeddingFunction[Embeddable], openai_ef)
-
-        if settings.chroma_collection is not None and ef is not None:
-            collection = chroma_client.get_or_create_collection(
-                name=settings.chroma_collection,
-                embedding_function=ef,
-            )
-        else:
-            raise ValueError(
-                "CHROMA_COLLECTION must be set (got None); cannot initialize ChromaDB collection"
-            )
 
         academy_client = await factory.create_user_client(
             name=f"rhea-manager-{str(uuid.uuid4())}"
         )
 
+        db_session: AsyncSession = AsyncSessionLocal()
+
         yield AppContext(
             settings=settings,
             logger=logger,
-            chroma_client=chroma_client,
-            openai_ef=openai_ef,
-            collection=collection,
+            embedding_client=embedding_client,
+            db_session=db_session,
             factory=factory,
             connector=connector,
             output_store=output_store,
             academy_client=academy_client,
-            galaxy_tools=galaxy_tools,
-            galaxy_tool_lookup=galaxy_tool_lookup,
             agents={},
             client_manager=client_manager,
             run_id=run_id,
@@ -185,22 +166,20 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
         if "Documentation" in r:
             mcp._resource_manager._resources.pop(r)
 
-    # Perform RAG
-    res = ctx.request_context.lifespan_context.collection.query(
-        query_texts=[query],
-        n_results=10,
+    # Get embedding of user query
+    query_vector: List[float] = get_embedding(
+        query, ctx.request_context.lifespan_context.embedding_client, settings.model
     )
-    retrieved = res["ids"][0]
+
+    # Perform RAG
+    session: AsyncSession = ctx.request_context.lifespan_context.db_session
+    tools: List[Tool] = await get_l2_distance(query_vector, session, limit=10)
 
     result = []
 
     # Populate tools
-    for t in retrieved:
-        try:
-            tool: Tool = ctx.request_context.lifespan_context.galaxy_tools[t]
-            tool_function: FastMCPTool = create_tool(tool, ctx)
-        except KeyError as e:
-            continue
+    for t in tools:
+        tool_function: FastMCPTool = create_tool(t, ctx)
 
         # Add tool to MCP server
         mcp.add_tool_to_context(
@@ -213,20 +192,20 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
         # Add documentation resource to MCP server
         mcp.add_resource(
             resource=TextResource(
-                uri=AnyUrl(url=f"resource://documentation/{tool.name}"),
-                name=f"{tool.name} Documentation",
-                description=f"Full documentation for {tool.name}",
+                uri=AnyUrl(url=f"resource://documentation/{t.name}"),
+                name=f"{t.name} Documentation",
+                description=f"Full documentation for {t.name}",
                 text=(
-                    tool.documentation
-                    if tool.documentation is not None
-                    else f"Documentation for '{tool.name}' is not available."
+                    t.documentation
+                    if t.documentation is not None
+                    else f"Documentation for '{t.name}' is not available."
                 ),
                 mime_type="text/markdown",
             )
         )
 
         # Add MCPTool to result
-        result.append(MCPTool.from_rhea(tool))
+        result.append(MCPTool.from_rhea(t))
 
     await ctx.request_context.session.send_tool_list_changed()  # notifiactions/tools/list_changed
     await ctx.request_context.session.send_resource_list_changed()  # notifications/resources/list_changed

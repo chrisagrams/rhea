@@ -15,8 +15,10 @@ from mcp.types import Tool as MCPTool
 from mcp.server.fastmcp.utilities.logging import get_logger
 from server.utils import create_tool
 from utils.schema import Tool as GalaxyTool
+from utils.models import get_galaxytool_by_name
 from redis import Redis
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from server.client_manager import ClientManager, ClientState
 
 logger = get_logger(__name__)
@@ -180,12 +182,9 @@ class RheaToolManager(ToolManager):
             raise RuntimeError(f"'context' is None")
         tool = self.get_tool(name)
         if not tool:
-            try:
-                galaxy_tools: dict[str, GalaxyTool] = context.request_context.lifespan_context.galaxy_tools  # type: ignore
-                galaxy_tool_lookup: dict[str, str] = context.request_context.lifespan_context.galaxy_tool_lookup  # type: ignore
-                tool_key = galaxy_tool_lookup[name]
-                t: GalaxyTool = galaxy_tools[tool_key]
-                tool = create_tool(t, ctx=context)
-            except KeyError:
+            session: AsyncSession = context.request_context.lifespan_context.db_session  # type: ignore
+            t: GalaxyTool | None = await get_galaxytool_by_name(session, name)
+            if t is None:
                 raise ToolError(f"Unknown tool: { name }")
+            tool = create_tool(t, ctx=context)
         return await tool.run(arguments, context=context, convert_result=convert_result)

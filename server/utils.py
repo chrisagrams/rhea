@@ -1,6 +1,5 @@
 import re
 import unicodedata
-import pickle
 import asyncio
 import time
 from mcp.server.fastmcp import Context
@@ -9,6 +8,7 @@ from mcp.server.fastmcp.tools import Tool as FastMCPTool
 from mcp.server.fastmcp.resources import FunctionResource
 from server.schema import MCPOutput, MCPDataOutput, Settings
 from agent.schema import RheaParam, RheaOutput
+from utils.models import get_galaxytool_by_id
 from manager.utils import get_handle_from_redis
 from proxystore.connectors.redis import RedisKey
 from proxystore.store import Store
@@ -17,6 +17,7 @@ from inspect import Signature, Parameter
 from manager.launch_agent import launch_agent
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from pydantic import AnyUrl
+from sqlalchemy.ext.asyncio import AsyncSession
 from redis import Redis
 
 
@@ -100,7 +101,12 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
 
             run_id = ctx.request_context.lifespan_context.run_id
 
-            tool: Tool = ctx.request_context.lifespan_context.galaxy_tools[tool_id]
+            session: AsyncSession = ctx.request_context.lifespan_context.db_session
+
+            tool: Tool | None = await get_galaxytool_by_id(session, tool_id)
+
+            if tool is None:
+                raise RuntimeError(f"No tool found with ID: {tool_id}")
 
             await ctx.report_progress(0, 1)
 
