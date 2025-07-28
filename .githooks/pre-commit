@@ -4,5 +4,18 @@ set -e
 echo "Formatting with Black..."
 black .
 
+changed_files=$(printf '%s\n' "$black_output" \
+  | sed -n -e 's/^reformatted //p' -e 's/^changed encoding of //p'
+)
+
+if [ -n "$changed_files" ]; then
+  echo "Staging Black changes..."
+  while IFS= read -r file; do
+    git add "$file"
+  done <<< "$changed_files"
+else
+  echo "No files needed reformatting."
+fi
+
 echo "Type-checking with Pyright ..."
 uv run pyright --warnings
