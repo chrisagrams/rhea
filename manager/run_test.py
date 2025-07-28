@@ -95,10 +95,6 @@ if __name__ == "__main__":
     # tool = tools["e1d52e9221388701"]
 
     with parsl.load(
-        generate_parsl_config(
-            backend="docker",
-            network="local",
-            debug=False
-        )
+        generate_parsl_config(backend="docker", network="local", debug=False)
     ) as dfk:
         tool_results = asyncio.run(run_tool_tests(tool))

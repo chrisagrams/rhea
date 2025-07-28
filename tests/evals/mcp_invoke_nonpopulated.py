@@ -10,6 +10,7 @@ from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
 from mcp.shared.context import RequestContext
 
+
 async def run():
     async with sse_client("http://localhost:3001/sse") as (read, write):
         async with ClientSession(read, write) as session:
@@ -33,8 +34,10 @@ async def run():
             assert str(rc) == "0"
             return tool_result
 
+
 def main():
     asyncio.run(run())
+
 
 if __name__ == "__main__":
     main()

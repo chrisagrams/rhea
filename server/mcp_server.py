@@ -69,7 +69,7 @@ if settings.debug_port is not None:
 
 
 # A 'run_id', generated on the begining of application startup, to keep track of which handles are stale
-run_id = str(uuid.uuid4()) 
+run_id = str(uuid.uuid4())
 
 
 connector = RedisConnector(settings.redis_host, settings.redis_port)
@@ -95,8 +95,9 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
     academy_client: Optional[UserExchangeClient] = None
     try:
         chroma_client = chromadb.HttpClient(
-            host=settings.chroma_host, port=settings.chroma_port,
-            settings=ChromaSettings(anonymized_telemetry=False)
+            host=settings.chroma_host,
+            port=settings.chroma_port,
+            settings=ChromaSettings(anonymized_telemetry=False),
         )
         openai_ef = embedding_functions.OpenAIEmbeddingFunction(
             api_key=settings.vllm_key,
@@ -116,7 +117,9 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
                 "CHROMA_COLLECTION must be set (got None); cannot initialize ChromaDB collection"
             )
 
-        academy_client = await factory.create_user_client(name=f"rhea-manager-{str(uuid.uuid4())}")
+        academy_client = await factory.create_user_client(
+            name=f"rhea-manager-{str(uuid.uuid4())}"
+        )
 
         yield AppContext(
             settings=settings,
@@ -132,9 +135,9 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             galaxy_tool_lookup=galaxy_tool_lookup,
             agents={},
             client_manager=client_manager,
-            run_id=run_id
+            run_id=run_id,
         )
-        
+
     except Exception as e:
         logger.error(e)
 
@@ -143,7 +146,8 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             await academy_client.close()
 
 
-mcp = RheaFastMCP("Rhea",
+mcp = RheaFastMCP(
+    "Rhea",
     lifespan=app_lifespan,
     host=settings.host,
     port=settings.port,
@@ -175,7 +179,6 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
             mcp._tool_manager._tools.pop(t)
     if session_id is not None:
         client_manager.clear_client_tools(session_id)
-    
 
     # Clear previous tool documentations
     for r in list(mcp._resource_manager._resources.keys()):
@@ -295,7 +298,7 @@ async def main():
             case "sse":
                 await serve_sse()
             case "streamable-http":
-                await mcp.run_streamable_http_async() # TODO: Fix notification options
+                await mcp.run_streamable_http_async()  # TODO: Fix notification options
     finally:
         parsl.dfk().cleanup()
         print("Application shutdown complete.")

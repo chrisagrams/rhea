@@ -15,7 +15,7 @@ docker_cmd = (
 
 podman_cmd = (
     "podman run --rm "
-    "-e HTTP_PROXY " 
+    "-e HTTP_PROXY "
     "-e HTTPS_PROXY "
     "-e http_proxy "
     "-e https_proxy "
@@ -26,19 +26,20 @@ podman_cmd = (
     "docker://chrisagrams/rhea-worker-agent "
 )
 
+
 def generate_parsl_config(
-        backend: Literal["docker", "podman"] = "docker", 
-        network: Literal["host", "local"] = "host",
-        provider: Literal["local", "pbs"] = "local",
-        max_workers_per_node: int = 1,
-        init_blocks: int = 0,
-        min_blocks: int = 0,
-        max_blocks: int = 5,
-        nodes_per_block: int = 1,
-        parallelism: int = 1,
-        debug: bool = False,
-        pbs_settings: Optional[PBSSettings] = None
-    ) -> Config:
+    backend: Literal["docker", "podman"] = "docker",
+    network: Literal["host", "local"] = "host",
+    provider: Literal["local", "pbs"] = "local",
+    max_workers_per_node: int = 1,
+    init_blocks: int = 0,
+    min_blocks: int = 0,
+    max_blocks: int = 5,
+    nodes_per_block: int = 1,
+    parallelism: int = 1,
+    debug: bool = False,
+    pbs_settings: Optional[PBSSettings] = None,
+) -> Config:
     """
     Generate Parsl config for Docker executor
     """
@@ -50,20 +51,19 @@ def generate_parsl_config(
     local_flag = "--add-host=host.docker.internal:host-gateway "
     host_flag = "--network host "
 
-    
-    if backend == 'docker':
+    if backend == "docker":
         prepend = docker_cmd.format(
             debug_port=debug_port,
-            network_flag=host_flag if network == "host" else local_flag
+            network_flag=host_flag if network == "host" else local_flag,
         )
-    elif backend == 'podman':
+    elif backend == "podman":
         prepend = podman_cmd.format(
             debug_port=debug_port,
-            network_flag=host_flag if network == "host" else local_flag
+            network_flag=host_flag if network == "host" else local_flag,
         )
     else:
         raise ValueError(f"Backend '{backend}' not supported")
-    
+
     launch_cmd_template = (
         "/home/rhea/venv/bin/python -u "
         f"{debugpy}"
@@ -91,7 +91,7 @@ def generate_parsl_config(
 
     if provider == "local":
         parsl_provider = LocalProvider(
-            launcher=WrappedLauncher(prepend=prepend), # type: ignore
+            launcher=WrappedLauncher(prepend=prepend),  # type: ignore
             init_blocks=init_blocks,
             min_blocks=min_blocks,
             max_blocks=max_blocks,
@@ -102,7 +102,7 @@ def generate_parsl_config(
         if pbs_settings is None:
             raise ValueError("PBSSettings cannot be none when provider = 'pbs'")
         parsl_provider = PBSProProvider(
-            launcher=WrappedLauncher(prepend=prepend), # type: ignore
+            launcher=WrappedLauncher(prepend=prepend),  # type: ignore
             account=pbs_settings.account,
             queue=pbs_settings.queue,
             walltime=pbs_settings.walltime,
@@ -116,7 +116,7 @@ def generate_parsl_config(
             parallelism=parallelism,
             worker_init=pbs_settings.worker_init,
         )
-    
+
     return Config(
         executors=[
             HighThroughputExecutor(

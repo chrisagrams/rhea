@@ -17,12 +17,15 @@ async def run():
         async with ClientSession(read, write) as session:
             await session.initialize()
 
-            resource_content = await session.read_resource(AnyUrl("proxystore://128108fa-3d2a-4838-b30f-f6d31ed5c766"))
+            resource_content = await session.read_resource(
+                AnyUrl("proxystore://128108fa-3d2a-4838-b30f-f6d31ed5c766")
+            )
             print(resource_content.contents)
 
 
 def main():
     asyncio.run(run())
+
 
 if __name__ == "__main__":
     main()

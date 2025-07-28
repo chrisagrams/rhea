@@ -1,6 +1,7 @@
 from parsl import python_app
 from utils.schema import Tool
 
+
 @python_app(executors=["rhea-workers"])
 def launch_agent(
     tool: Tool,
@@ -26,8 +27,7 @@ def launch_agent(
         factory = RedisExchangeFactory(hostname=redis_host, port=redis_port)
 
         mgr_ctx = await Manager.from_exchange_factory(
-            factory=factory,
-            executors=ThreadPoolExecutor()
+            factory=factory, executors=ThreadPoolExecutor()
         )
         manager = await mgr_ctx.__aenter__()
         handle = await manager.launch(
@@ -46,6 +46,6 @@ def launch_agent(
         serialized = pickle.dumps(handle)
         r.set(f"agent_handle:{run_id}-{tool.id}", serialized)
 
-        await asyncio.Event().wait() # Keep the Parsl block alive 
+        await asyncio.Event().wait()  # Keep the Parsl block alive
 
     return asyncio.run(_do_launch())

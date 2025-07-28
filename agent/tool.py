@@ -65,8 +65,12 @@ class RheaToolAgent(Agent):
 
     async def agent_on_startup(self) -> None:
         # Initialize ProxyStore
-        self.input_store = Store("rhea-input", connector=self.connector, register=True)
-        self.output_store = Store("rhea-output", connector=self.connector, register=True)
+        self.input_store = Store(
+            "rhea-input", connector=self.connector, register=True
+        )
+        self.output_store = Store(
+            "rhea-output", connector=self.connector, register=True
+        )
 
         # Create coroutine to create Conda environment and install Conda packages
         conda_coro = install_conda_env(
@@ -356,8 +360,13 @@ class RheaToolAgent(Agent):
             cwd = output
 
             # Populate input environment variables and pull input files in a seperate thread
-            await asyncio.to_thread(self.build_env_parameters,
-                env, params, self.tool.inputs.params, input, self.input_store
+            await asyncio.to_thread(
+                self.build_env_parameters,
+                env,
+                params,
+                self.tool.inputs.params,
+                input,
+                self.input_store,
             )
 
             # Configure outputs
@@ -407,8 +416,12 @@ class RheaToolAgent(Agent):
             ]
             self.logger.info(f"Running subprocess: {cmd}")
             result = await asyncio.to_thread(
-                subprocess.run, cmd, env=env, cwd=env["__tool_directory__"],
-                capture_output=True, text=True
+                subprocess.run,
+                cmd,
+                env=env,
+                cwd=env["__tool_directory__"],
+                capture_output=True,
+                text=True,
             )
             if result.returncode != 0:
                 self.logger.error(

@@ -52,7 +52,9 @@ def sanitize_tool_name(text: str, repl: str = "_") -> str:
     return text.strip(repl + "-")
 
 
-def create_proxystore_function_resource(file: MCPDataOutput, ctx: Context) -> FunctionResource:
+def create_proxystore_function_resource(
+    file: MCPDataOutput, ctx: Context
+) -> FunctionResource:
     async def _fetch() -> bytes:
         redis_key = RedisKey(redis_key=file.key)
         output_store: Store = ctx.request_context.lifespan_context.output_store
@@ -60,7 +62,7 @@ def create_proxystore_function_resource(file: MCPDataOutput, ctx: Context) -> Fu
         res = output_store.get(redis_key)
         if res is None:
             raise ValueError(f"Key {file.key} not in ProxyStore")
-        
+
         return res
 
     return FunctionResource(
@@ -73,13 +75,15 @@ def create_proxystore_function_resource(file: MCPDataOutput, ctx: Context) -> Fu
     )
 
 
-async def get_handle_from_redis(tool_id: str, run_id: str, r: Redis, timeout: float = 30.0) -> UnboundRemoteHandle | None:
+async def get_handle_from_redis(
+    tool_id: str, run_id: str, r: Redis, timeout: float = 30.0
+) -> UnboundRemoteHandle | None:
     interval = 0.1
     deadline = time.time() + timeout
     while True:
         data = r.get(f"agent_handle:{run_id}-{tool_id}")
         if data is not None:
-            result: UnboundRemoteHandle = pickle.loads(data) # type: ignore
+            result: UnboundRemoteHandle = pickle.loads(data)  # type: ignore
             return result
         if time.time() > deadline:
             return None
@@ -124,7 +128,9 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
 
             if tool_id not in ctx.request_context.lifespan_context.agents:
                 # First, quickly check if the agent exists in other contexts
-                unbound_handle: UnboundRemoteHandle | None = await get_handle_from_redis(tool.id, run_id, r, timeout=1)
+                unbound_handle: UnboundRemoteHandle | None = (
+                    await get_handle_from_redis(tool.id, run_id, r, timeout=1)
+                )
 
                 # Another context already initialized this tool, bind it to this Academy client:
                 if unbound_handle is not None:
@@ -146,7 +152,9 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
                         minio_secure=False,
                     )
 
-                    unbound_handle: UnboundRemoteHandle | None = await get_handle_from_redis(tool.id, run_id, r, timeout=30)
+                    unbound_handle: UnboundRemoteHandle | None = (
+                        await get_handle_from_redis(tool.id, run_id, r, timeout=30)
+                    )
 
                     if unbound_handle is None:
                         raise RuntimeError("Never received handle from Parsl worker.")
@@ -173,13 +181,13 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
 
             result = MCPOutput.from_rhea(tool_result)
 
-            # Add ProxyStore resource 
+            # Add ProxyStore resource
             if result.files is not None:
                 for file in result.files:
                     ctx.fastmcp.add_resource(
                         resource=create_proxystore_function_resource(file, ctx)
-                        )
-            
+                    )
+
             # Notify the client that we have new output resources
             await ctx.request_context.session.send_resource_list_changed()
 

@@ -19,14 +19,10 @@ logging.basicConfig(level=logging.INFO)
 
 async def main():
     with parsl.load(
-        generate_parsl_config(
-            backend="docker",
-            network="local",
-            debug=False
-        )
+        generate_parsl_config(backend="docker", network="local", debug=False)
     ) as dfk:
         with open("tools_dict.pkl", "rb") as f:
-                tools = pickle.load(f)
+            tools = pickle.load(f)
         tool = tools["204bd0ff6499fcca"]
         connector = RedisConnector("localhost", 6379)
 
@@ -49,7 +45,6 @@ async def main():
                 factory = RedisExchangeFactory("localhost", 6379)
                 client = await factory.create_user_client(name="rhea-manager")
 
-
                 future_handle = launch_agent(
                     tool,
                     redis_host="host.docker.internal",
@@ -64,9 +59,9 @@ async def main():
 
                 handle: RemoteHandle = unbound_handle.bind_to_client(client)
 
-                packages = await ( await handle.get_installed_packages() )
+                packages = await (await handle.get_installed_packages())
 
-                tool_result = await ( await handle.run_tool(rhea_params) )
+                tool_result = await (await handle.run_tool(rhea_params))
 
                 print(packages)
 
