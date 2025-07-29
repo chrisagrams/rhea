@@ -9,11 +9,13 @@ from proxystore.store import Store
 from utils.schema import Tool
 from agent.tool import RheaToolAgent
 from agent.schema import RheaDataOutput, RheaOutput
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from typing import List, Optional, Literal
 from server.client_manager import ClientManager
+from academy.handle import RemoteHandle
+from datetime import datetime
 
 
 class Settings(BaseSettings):
@@ -81,6 +83,26 @@ class K8Settings(BaseSettings):
     request_mem: str = "1024Mi"
 
 
+class AgentState(BaseModel):
+    tool_id: str
+    last_accessed: float = datetime.now().timestamp()
+    _handle: RemoteHandle = PrivateAttr()
+
+    def __init__(self, handle: RemoteHandle, tool_id: str, **kwargs):
+        super().__init__(tool_id=tool_id, **kwargs)
+        self._handle = handle
+
+    @property
+    def handle(self):
+        self.last_accessed = datetime.now().timestamp()
+        return self._handle
+
+    @handle.setter
+    def handle(self, v: RemoteHandle):
+        self._handle = v
+        self.last_accessed = datetime.now().timestamp()
+
+
 @dataclass
 class AppContext:
     settings: Settings
@@ -91,7 +113,7 @@ class AppContext:
     connector: RedisConnector
     output_store: Store
     academy_client: UserExchangeClient
-    agents: dict[str, AgentId[RheaToolAgent]]
+    agents: dict[str, AgentState]
     client_manager: ClientManager
     run_id: str
 

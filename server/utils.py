@@ -6,7 +6,7 @@ from mcp.server.fastmcp import Context
 from utils.schema import Tool, Inputs
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
 from mcp.server.fastmcp.resources import FunctionResource
-from server.schema import MCPOutput, MCPDataOutput, Settings
+from server.schema import MCPOutput, MCPDataOutput, Settings, AgentState
 from agent.schema import RheaParam, RheaOutput
 from utils.models import get_galaxytool_by_id
 from manager.utils import get_handle_from_redis
@@ -129,7 +129,9 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
                     handle: RemoteHandle = unbound_handle.bind_to_client(
                         ctx.request_context.lifespan_context.academy_client
                     )
-                    ctx.request_context.lifespan_context.agents[tool_id] = handle
+                    ctx.request_context.lifespan_context.agents[tool_id] = AgentState(
+                        tool_id=tool_id, handle=handle
+                    )
 
                 else:
                     # Launch agent
@@ -157,10 +159,14 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
 
                     await ctx.info(f"Lanched agent {handle.agent_id}")
 
-                    ctx.request_context.lifespan_context.agents[tool_id] = handle
+                    ctx.request_context.lifespan_context.agents[tool_id] = AgentState(
+                        tool_id=tool_id, handle=handle
+                    )
 
             # Get handle from dictionary
-            handle: RemoteHandle = ctx.request_context.lifespan_context.agents[tool_id]
+            handle: RemoteHandle = ctx.request_context.lifespan_context.agents[
+                tool_id
+            ].handle
 
             await ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
             await ctx.report_progress(0.1, 1)
