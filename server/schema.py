@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     parsl_container_network: Literal["host", "local"] = "host"
     parsl_container_debug: bool = False
     parsl_max_workers_per_node: int = 1
-    parsl_provider: Literal["local", "pbs"] = "local"
+    parsl_provider: Literal["local", "pbs", "k8"] = "local"
     parsl_init_blocks: int = 0
     parsl_min_blocks: int = 0
     parsl_max_blocks: int = 5
@@ -69,6 +69,16 @@ class PBSSettings(BaseSettings):
     select_options: str
     worker_init: str = ""  # Commands to run before workers launched
     cpus_per_node: int = 1  # Hardware threads per node
+
+
+class K8Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env_k8", env_file_encoding="utf-8")
+
+    namespace: str = "rhea"
+    max_cpu: float = 2.0
+    max_mem: str = "2048Mi"
+    request_cpu: float = 1.0
+    request_mem: str = "1024Mi"
 
 
 @dataclass

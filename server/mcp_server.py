@@ -18,12 +18,7 @@ from openai import OpenAI
 from server.rhea_fastmcp import RheaFastMCP
 from server.client_manager import LocalClientManager, ClientManager
 from utils.schema import Tool
-from server.schema import (
-    AppContext,
-    MCPTool,
-    Settings,
-    PBSSettings,
-)
+from server.schema import AppContext, MCPTool, Settings, PBSSettings, K8Settings
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine,
@@ -53,12 +48,20 @@ args = parser.parse_args()
 
 settings = Settings()
 
-pbs_settings = None
+pbs_settings: PBSSettings | None = None
+k8_settings: K8Settings | None = None
+
 if Path(".env_pbs").exists():
     try:
         pbs_settings = PBSSettings()  # type: ignore
     except ValidationError:
         pbs_settings = None
+
+if Path(".env_k8").exists():
+    try:
+        k8_settings = K8Settings()
+    except ValidationError:
+        k8_settings = None
 
 
 if settings.debug_port is not None:
@@ -268,6 +271,7 @@ async def main():
                 parallelism=settings.parsl_parallelism,
                 debug=settings.parsl_container_debug,
                 pbs_settings=pbs_settings,
+                k8_settings=k8_settings,
             )
         )
 
