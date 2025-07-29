@@ -59,13 +59,13 @@ def generate_parsl_config(
         prepend = docker_cmd.format(
             debug_port=debug_port,
             network_flag=host_flag if network == "host" else local_flag,
-            docker_image=DOCKER_IMAGE
+            docker_image=DOCKER_IMAGE,
         )
     elif backend == "podman":
         prepend = podman_cmd.format(
             debug_port=debug_port,
             network_flag=host_flag if network == "host" else local_flag,
-            docker_image=DOCKER_IMAGE
+            docker_image=DOCKER_IMAGE,
         )
     else:
         raise ValueError(f"Backend '{backend}' not supported")

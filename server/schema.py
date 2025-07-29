@@ -72,13 +72,13 @@ class PBSSettings(BaseSettings):
 
 
 class K8Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env_k8", env_file_encoding='utf-8')
+    model_config = SettingsConfigDict(env_file=".env_k8", env_file_encoding="utf-8")
 
-    namespace: str = 'rhea'
+    namespace: str = "rhea"
     max_cpu: float = 2.0
-    max_mem: str = '2048Mi'
+    max_mem: str = "2048Mi"
     request_cpu: float = 1.0
-    request_mem: str = '1024Mi'
+    request_mem: str = "1024Mi"
 
 
 @dataclass

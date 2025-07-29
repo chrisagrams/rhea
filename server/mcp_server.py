@@ -18,13 +18,7 @@ from openai import OpenAI
 from server.rhea_fastmcp import RheaFastMCP
 from server.client_manager import LocalClientManager, ClientManager
 from utils.schema import Tool
-from server.schema import (
-    AppContext,
-    MCPTool,
-    Settings,
-    PBSSettings,
-    K8Settings
-)
+from server.schema import AppContext, MCPTool, Settings, PBSSettings, K8Settings
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine,
@@ -65,7 +59,7 @@ if Path(".env_pbs").exists():
 
 if Path(".env_k8").exists():
     try:
-        k8_settings = K8Settings() 
+        k8_settings = K8Settings()
     except ValidationError:
         k8_settings = None
 
