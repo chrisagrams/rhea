@@ -15,8 +15,10 @@ test_files/
 .DS_Store/
 
 .env
+.env.backup
 .env.docker
 .env_pbs
+.env_k8
 
 data/
 results/

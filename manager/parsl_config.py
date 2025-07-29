@@ -1,16 +1,19 @@
 from typing import Literal, Optional
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
-from parsl.providers import LocalProvider, PBSProProvider
+from parsl.providers import LocalProvider, PBSProProvider, KubernetesProvider
 from parsl.launchers import WrappedLauncher
-from server.schema import PBSSettings
+from kubernetes import config as k8s_config
+from server.schema import PBSSettings, K8Settings
+
+DOCKER_IMAGE = "chrisagrams/rhea-worker-agent:latest"
 
 docker_cmd = (
     "docker run --rm "
     "{debug_port} "
     "--platform linux/amd64 "  # Ensure amd64 platform is used
     "{network_flag} "
-    "chrisagrams/rhea-worker-agent:latest "
+    "{docker_image} "
 )
 
 podman_cmd = (
@@ -23,14 +26,14 @@ podman_cmd = (
     "--user root "
     "--platform linux/amd64 "  # Ensure amd64 platform is used
     "{network_flag} "
-    "docker://chrisagrams/rhea-worker-agent "
+    "docker://{docker_image} "
 )
 
 
 def generate_parsl_config(
     backend: Literal["docker", "podman"] = "docker",
     network: Literal["host", "local"] = "host",
-    provider: Literal["local", "pbs"] = "local",
+    provider: Literal["local", "pbs", "k8"] = "local",
     max_workers_per_node: int = 1,
     init_blocks: int = 0,
     min_blocks: int = 0,
@@ -39,6 +42,7 @@ def generate_parsl_config(
     parallelism: int = 1,
     debug: bool = False,
     pbs_settings: Optional[PBSSettings] = None,
+    k8_settings: Optional[K8Settings] = None,
 ) -> Config:
     """
     Generate Parsl config for Docker executor
@@ -55,11 +59,13 @@ def generate_parsl_config(
         prepend = docker_cmd.format(
             debug_port=debug_port,
             network_flag=host_flag if network == "host" else local_flag,
+            docker_image=DOCKER_IMAGE
         )
     elif backend == "podman":
         prepend = podman_cmd.format(
             debug_port=debug_port,
             network_flag=host_flag if network == "host" else local_flag,
+            docker_image=DOCKER_IMAGE
         )
     else:
         raise ValueError(f"Backend '{backend}' not supported")
@@ -100,7 +106,7 @@ def generate_parsl_config(
         )
     elif provider == "pbs":
         if pbs_settings is None:
-            raise ValueError("PBSSettings cannot be none when provider = 'pbs'")
+            raise ValueError("PBSSettings cannot be None when provider = 'pbs'")
         parsl_provider = PBSProProvider(
             launcher=WrappedLauncher(prepend=prepend),  # type: ignore
             account=pbs_settings.account,
@@ -115,6 +121,26 @@ def generate_parsl_config(
             cpus_per_node=pbs_settings.cpus_per_node,
             parallelism=parallelism,
             worker_init=pbs_settings.worker_init,
+        )
+    elif provider == "k8":
+        if k8_settings is None:
+            raise ValueError("K8Settings cannot be None when provider = 'k8'")
+        try:
+            k8s_config.load_kube_config()
+        except Exception:
+            k8s_config.load_incluster_config()
+
+        parsl_provider = KubernetesProvider(
+            image=DOCKER_IMAGE,
+            namespace=k8_settings.namespace,
+            init_blocks=init_blocks,
+            max_blocks=max_blocks,
+            nodes_per_block=nodes_per_block,
+            parallelism=parallelism,
+            max_cpu=k8_settings.max_cpu,
+            max_mem=k8_settings.max_mem,
+            init_cpu=k8_settings.request_cpu,
+            init_mem=k8_settings.request_mem,
         )
 
     return Config(
