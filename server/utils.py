@@ -182,7 +182,7 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
             # Add ProxyStore resource
             if result.files is not None:
                 for file in result.files:
-                    ctx.fastmcp.add_resource(
+                    ctx.request_context.lifespan_context.resource_manager.add_resource_to_context(
                         resource=create_proxystore_function_resource(file, ctx)
                     )
 

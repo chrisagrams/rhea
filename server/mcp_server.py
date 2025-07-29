@@ -119,6 +119,7 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             academy_client=academy_client,
             agents={},
             client_manager=client_manager,
+            resource_manager=mcp._resource_manager,
             run_id=run_id,
         )
 
@@ -193,7 +194,7 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
         )
 
         # Add documentation resource to MCP server
-        mcp.add_resource(
+        mcp.add_resource_to_context(
             resource=TextResource(
                 uri=AnyUrl(url=f"resource://documentation/{t.name}"),
                 name=f"{t.name} Documentation",

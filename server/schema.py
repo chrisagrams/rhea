@@ -12,10 +12,13 @@ from agent.schema import RheaDataOutput, RheaOutput
 from pydantic import BaseModel, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, TYPE_CHECKING
 from server.client_manager import ClientManager
 from academy.handle import RemoteHandle
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from server.rhea_fastmcp import RheaResourceManager
 
 
 class Settings(BaseSettings):
@@ -115,6 +118,7 @@ class AppContext:
     academy_client: UserExchangeClient
     agents: dict[str, AgentState]
     client_manager: ClientManager
+    resource_manager: "RheaResourceManager"
     run_id: str
 
 
