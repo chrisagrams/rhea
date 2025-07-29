@@ -18,8 +18,12 @@ def launch_agent(
     from concurrent.futures import ThreadPoolExecutor
     from academy.exchange.redis import RedisExchangeFactory
     from academy.manager import Manager
+    from academy.exception import AgentTerminatedError
     from agent.tool import RheaToolAgent
     from redis import Redis
+
+    HEARTBEAT_INTERVAL = 30
+    HEARTBEAT_TIMEOUT = 10
 
     r = Redis(host=redis_host, port=redis_port)
 
@@ -43,9 +47,17 @@ def launch_agent(
         )
 
         # Put the handle in Redis
+        key = f"agent_handle:{run_id}-{tool.id}"
         serialized = pickle.dumps(handle)
-        r.set(f"agent_handle:{run_id}-{tool.id}", serialized)
+        r.set(key, serialized)
 
-        await asyncio.Event().wait()  # Keep the Parsl block alive
+        try:
+            while True:
+                await asyncio.wait_for(handle.ping(), timeout=HEARTBEAT_TIMEOUT)
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+        except (AgentTerminatedError, asyncio.TimeoutError):
+            pass
+        finally:
+            r.delete(key)  # Remove Redis handle
 
     return asyncio.run(_do_launch())
