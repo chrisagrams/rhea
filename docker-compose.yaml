@@ -15,8 +15,7 @@ services:
   redis:
     image: redis:7
     container_name: rhea-redis
-    ports:
-      - "6379:6379"
+    network_mode: host
     volumes:
       - redis-data:/data
     entrypoint: ["redis-server"]
@@ -24,7 +23,7 @@ services:
       - "--save"
       - ""
       - "--appendonly"
-      - "yes"
+      - "no"
     restart: unless-stopped
   
   minio:
