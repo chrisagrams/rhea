@@ -4,8 +4,11 @@ import subprocess
 import json
 import os
 import shlex
+import asyncio
+import logging
 from types import SimpleNamespace
 from agent.tool import RheaToolAgent
+from agent.utils import configure_tool_directory, cleanup_tool_directory
 from utils.schema import Tool, Test
 from utils.process import process_inputs
 from proxystore.connectors.redis import RedisConnector
@@ -22,7 +25,9 @@ def agent():
 
 @pytest.fixture
 def tools():
-    with open("tools_dict.pkl", "rb") as f:
+    with open(
+        "/Users/chrisgrams/Notes/Argonne/Galaxy-Tool-Wrapper/tools_dict.pkl", "rb"
+    ) as f:
         return pickle.load(f)
 
 
@@ -67,7 +72,8 @@ def sample_tool(tools):
     # tool_id = "e419dee9cfaa2f3f" # Bug
     # tool_id = "ec6d2afcc6959e78"
     # tool_id = "dba308ddf7976bcd"
-    tool_id = "b24d624f2c53f698"
+    # tool_id = "b24d624f2c53f698"
+    tool_id = "85625aa18c72655a"
     return tools.get(tool_id) or next(iter(tools.values()))
 
 
@@ -121,6 +127,10 @@ def test_simple_replace_galaxy_var_with_default(agent):
 def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
     agent.tool = sample_tool
     agent.minio = minio_client
+    agent.logger = logging.getLogger(__name__)
+    agent.tool_directory = asyncio.run(
+        configure_tool_directory(sample_tool.id, minio_client)
+    )
 
     if len(sample_tool.tests.tests) == 0:
         assert True
@@ -150,6 +160,10 @@ def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
 def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
     agent.tool = sample_tool
     agent.minio = minio_client
+    agent.logger = logging.getLogger(__name__)
+    agent.tool_directory = asyncio.run(
+        configure_tool_directory(sample_tool.id, minio_client)
+    )
 
     if len(sample_tool.tests.tests) == 0:
         assert True
@@ -186,6 +200,8 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
         if "not found in bucket" in msg:
             assert True
             return
+    finally:
+        asyncio.run(cleanup_tool_directory(agent.tool_directory))
 
 
 def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
