@@ -4,7 +4,7 @@ from openai import OpenAI
 from academy.identifier import AgentId
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
-from proxystore.connectors.redis import RedisConnector
+from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from utils.schema import Tool
 from agent.tool import RheaToolAgent
@@ -139,6 +139,15 @@ class MCPDataOutput(BaseModel):
             format=p.format,
         )
 
+    def to_rhea(self) -> RheaDataOutput:
+        return RheaDataOutput(
+            key=RedisKey(redis_key=self.key),
+            size=self.size,
+            filename=self.filename,
+            name=self.name,
+            format=self.format,
+        )
+
 
 class MCPOutput(BaseModel):
     return_code: int
@@ -156,6 +165,18 @@ class MCPOutput(BaseModel):
         return cls(
             return_code=p.return_code, stdout=p.stdout, stderr=p.stderr, files=files
         )
+
+    def to_rhea(self) -> RheaOutput:
+        result = RheaOutput(
+            return_code=self.return_code, stdout=self.stdout, stderr=self.stderr
+        )
+
+        if self.files:
+            result.files = []
+            for f in self.files:
+                result.files.append(f.to_rhea())
+
+        return result
 
 
 class MCPTool(BaseModel):

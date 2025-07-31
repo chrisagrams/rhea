@@ -7,6 +7,7 @@ import subprocess
 import conda_pack
 import zstandard
 import tarfile
+import shutil
 from utils.schema import Requirement
 from typing import List
 from tempfile import mkdtemp, mktemp
@@ -88,6 +89,17 @@ async def configure_tool_directory(tool_id: str, minio: Minio) -> str:
     await asyncio.gather(*tasks)
     logger.info(f"Objects pulled into {dest_dir}")
     return dest_dir
+
+
+async def cleanup_tool_directory(dir_path: str) -> None:
+    """
+    Remove the temporary directory created for a tool.
+    """
+    try:
+        await asyncio.to_thread(shutil.rmtree, dir_path)
+        logger.info(f"Cleaned up tool directory: {dir_path}")
+    except Exception as e:
+        logger.warning(f"Failed to clean up {dir_path}: {e}")
 
 
 async def install_conda_env(

@@ -44,10 +44,14 @@ class GalaxyFileVar:
 
         return ext == file_type.lower()
 
+    @property
+    def element_identifier(self):
+        return self.filename
+
 
 class GalaxyVar:
     def __init__(self, value):
-        self._value = value
+        self._value = value if value is not None else {}
         self._nested = {}
 
     def __str__(self):
