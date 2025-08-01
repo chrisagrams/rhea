@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
 )
-from sqlalchemy.pool import QueuePool
 from argparse import ArgumentParser
 from tests.evals.helpers import run_tool_tests
 from server.schema import MCPOutput
@@ -62,7 +61,6 @@ engine: AsyncEngine = create_async_engine(
     DATABASE_URL,
     echo=False,
     future=True,
-    poolclass=QueuePool,
     pool_size=args.workers,
     max_overflow=40,
     pool_timeout=30,
