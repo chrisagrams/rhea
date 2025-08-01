@@ -22,3 +22,5 @@ test_files/
 
 data/
 results/
+
+*.csv

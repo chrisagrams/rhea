@@ -1,34 +1,9 @@
 import asyncio
-import os
-import time
-import csv
-from datetime import datetime
-from pathlib import Path
-from contextlib import contextmanager
+from tests.evals.helpers import log_time
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
 from mcp.shared.context import RequestContext
-
-_TIMING_CSV = (
-    Path("results") / f"timings_{datetime.now().strftime('%Y%m%d-%H%M%S')}.csv"
-)
-
-
-@contextmanager
-def log_time(label: str, csv_path: Path = _TIMING_CSV):
-    start_wall = time.time()
-    start_perf = time.perf_counter()
-    try:
-        yield
-    finally:
-        elapsed = time.perf_counter() - start_perf
-        header_needed = not csv_path.exists()
-        with csv_path.open("a", newline="") as f:
-            w = csv.writer(f)
-            if header_needed:
-                w.writerow(["label", "start_unix", "end_unix", "elapsed_s"])
-            w.writerow([label, start_wall, start_wall + elapsed, f"{elapsed:.6f}"])
 
 
 # server_params = StdioServerParameters(
