@@ -2,6 +2,7 @@ import os
 import time
 import csv
 import logging
+import urllib3
 from datetime import datetime
 from pathlib import Path
 from contextlib import contextmanager
@@ -69,12 +70,22 @@ async def run_tool_tests(
     minio_endpoint: str = "localhost:9000",
     minio_access: str = "admin",
     minio_secret: str = "password",
+    http_client: urllib3.PoolManager | None = None,
 ) -> MCPOutput | None:
+    if http_client is None:
+        http_client = urllib3.PoolManager(
+            num_pools=1,
+            maxsize=50,
+            timeout=urllib3.Timeout(connect=5.0, read=30.0),
+            retries=urllib3.Retry(total=3),
+        )
+
     minio_client = Minio(
         minio_endpoint,
         access_key=minio_access,
         secret_key=minio_secret,
         secure=False,
+        http_client=http_client,
     )
     connector = RedisConnector(redis_host, redis_port)
 

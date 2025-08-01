@@ -9,9 +9,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
 )
+from sqlalchemy.pool import QueuePool
 from argparse import ArgumentParser
 from tests.evals.helpers import run_tool_tests
 from server.schema import MCPOutput
+import urllib3
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,9 +58,24 @@ parser.add_argument(
 args = parser.parse_args()
 
 DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/rhea"
-engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
+engine: AsyncEngine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    poolclass=QueuePool,
+    pool_size=args.workers,
+    max_overflow=40,
+    pool_timeout=30,
+)
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+)
+
+http_client = urllib3.PoolManager(
+    num_pools=args.workers,
+    maxsize=50,
+    timeout=urllib3.Timeout(connect=5.0, read=30.0),
+    retries=urllib3.Retry(total=3),
 )
 
 
@@ -72,6 +90,7 @@ async def test_tool(tool_id: str):
             minio_endpoint=args.minio_endpoint,
             minio_access=args.minio_access,
             minio_secret=args.minio_secret,
+            http_client=http_client,
         )
 
 
