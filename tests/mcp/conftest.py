@@ -5,11 +5,15 @@ import csv
 import pytest
 import anyio
 import signal
+
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.sse import sse_client
+
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,7 +27,7 @@ def coverage_env():
 
 
 @pytest.fixture
-async def client_session(coverage_env):
+async def http_client_session(coverage_env):
     python = sys.executable
     cmd = [
         python,
@@ -52,6 +56,37 @@ async def client_session(coverage_env):
             write,
             get_session_id_callback,
         ):
+            async with ClientSession(read, write) as session:
+                yield session
+
+    finally:
+        proc.send_signal(signal.SIGINT)
+        await proc.wait()
+
+
+@pytest.fixture
+async def sse_client_session(coverage_env):
+    python = sys.executable
+    cmd = [
+        python,
+        "-m",
+        "coverage",
+        "run",
+        "--parallel-mode",
+        "-m",
+        "server.mcp_server",
+        "--transport",
+        "sse",
+    ]
+
+    proc = await anyio.open_process(
+        cmd, cwd=os.getcwd(), env=os.environ.copy(), stderr=sys.stderr
+    )
+
+    await anyio.sleep(3)
+
+    try:
+        async with sse_client("http://localhost:3001/sse/") as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 yield session

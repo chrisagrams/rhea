@@ -260,10 +260,6 @@ async def serve_sse():
 
 async def main():
     try:
-        if os.environ.get("COVERAGE_PROCESS_START"):
-            import coverage
-
-            coverage.process_startup()
         parsl.load(
             generate_parsl_config(
                 backend=settings.parsl_container_backend,
