@@ -6,6 +6,13 @@ import pytest
 import anyio
 import signal
 
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    AsyncEngine,
+    create_async_engine,
+    async_sessionmaker,
+)
+
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.client.sse import sse_client
@@ -14,9 +21,42 @@ from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
 
+from minio import Minio
+
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+@pytest.fixture
+async def db_session():
+    DATABASE_URL = os.environ.get(
+        "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/rhea"
+    )
+    engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
+    AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+    async with AsyncSessionLocal() as db_session:
+        yield db_session
+
+
+@pytest.fixture
+def connector():
+    return RedisConnector("localhost", 6379)
+
+
+@pytest.fixture
+def minio_client():
+    return Minio(
+        "localhost:9000",
+        access_key="admin",
+        secret_key="password",
+        secure=False,
+    )
 
 
 @pytest.fixture(scope="session")
