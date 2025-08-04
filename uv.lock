@@ -1859,6 +1859,18 @@ wheels = [
 ]
 
 [[package]]
+name = "outcome"
+version = "1.3.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/df/77698abfac98571e65ffeb0c1fba8ffd692ab8458d617a0eed7d9a8d38f2/outcome-1.3.0.post0.tar.gz", hash = "sha256:9dcf02e65f2971b80047b377468e72a268e15c0af3cf1238e6ff14f7f91143b8", size = 21060, upload-time = "2023-10-26T04:26:04.361Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/8b/5ab7257531a5d830fc8000c476e63c935488d74609b50f9384a643ec0a62/outcome-1.3.0.post0-py2.py3-none-any.whl", hash = "sha256:e771c5ce06d1415e356078d3bdd68523f284b4ce5419828922b6871e65eda82b", size = 10692, upload-time = "2023-10-26T04:26:02.532Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2693,6 +2705,7 @@ dependencies = [
     { name = "cachetools" },
     { name = "cheetah3" },
     { name = "conda-pack" },
+    { name = "coverage", extra = ["toml"] },
     { name = "debugpy" },
     { name = "fastapi", extra = ["standard"] },
     { name = "greenlet" },
@@ -2712,6 +2725,7 @@ dependencies = [
     { name = "shellcheck-py" },
     { name = "sqlalchemy" },
     { name = "tqdm" },
+    { name = "trio" },
     { name = "zstandard" },
 ]
 
@@ -2723,6 +2737,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=6.1.0" },
     { name = "cheetah3", specifier = ">=3.2.6.post1" },
     { name = "conda-pack", specifier = ">=0.8.1" },
+    { name = "coverage", extras = ["toml"], specifier = ">=7.9.1" },
     { name = "debugpy", specifier = ">=1.8.14" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.14" },
     { name = "greenlet", specifier = ">=3.2.3" },
@@ -2742,6 +2757,7 @@ requires-dist = [
     { name = "shellcheck-py", specifier = ">=0.10.0.1" },
     { name = "sqlalchemy", specifier = ">=2.0.41" },
     { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "trio", specifier = ">=0.30.0" },
     { name = "zstandard", specifier = ">=0.23.0" },
 ]
 
@@ -3162,6 +3178,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737, upload-time = "2024-11-24T20:12:22.481Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2", size = 78540, upload-time = "2024-11-24T20:12:19.698Z" },
+]
+
+[[package]]
+name = "trio"
+version = "0.30.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "cffi", marker = "implementation_name != 'pypy' and os_name == 'nt'" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "idna" },
+    { name = "outcome" },
+    { name = "sniffio" },
+    { name = "sortedcontainers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/01/c1/68d582b4d3a1c1f8118e18042464bb12a7c1b75d64d75111b297687041e3/trio-0.30.0.tar.gz", hash = "sha256:0781c857c0c81f8f51e0089929a26b5bb63d57f927728a5586f7e36171f064df", size = 593776, upload-time = "2025-04-21T00:48:19.507Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/69/8e/3f6dfda475ecd940e786defe6df6c500734e686c9cd0a0f8ef6821e9b2f2/trio-0.30.0-py3-none-any.whl", hash = "sha256:3bf4f06b8decf8d3cf00af85f40a89824669e2d033bb32469d34840edcfc22a5", size = 499194, upload-time = "2025-04-21T00:48:17.167Z" },
 ]
 
 [[package]]

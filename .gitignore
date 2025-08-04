@@ -24,3 +24,7 @@ data/
 results/
 
 *.csv
+
+# Coverage reports
+.coverage
+.coverage.*

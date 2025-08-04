@@ -18,6 +18,15 @@
       "preLaunchTask": "Build rhea-worker (multi-arch)"
     },
     {
+      "name": "Run MCP test invocation",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "tests.evals.mcp_run_tool_test_single",
+      "justMyCode": false,
+      "args": ["${input:mcpArgs}"],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Attach to Parsl Worker",
       "type": "debugpy",
       "request": "attach",
@@ -48,6 +57,14 @@
       ],
       "justMyCode": false,
       // "preLaunchTask": "Run MCP via uv"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "mcpArgs",
+      "type": "promptString",
+      "description": "Enter command-line arguments for the MCP test",
+      "default": ""
     }
   ]
 }

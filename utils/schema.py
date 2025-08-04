@@ -272,12 +272,31 @@ class Param(BaseModel):
 
         if self.type == "boolean":
             annotation = Optional[bool] if self.optional else bool
+        # elif self.type == "select" and self.multiple:
+        #     annotation = Optional[List[str]] if self.optional else List[str]
+        elif self.type == "integer":
+            annotation = Optional[int] if self.optional else int
+        elif self.type == "float":
+            annotation = Optional[float] if self.optional else float
         else:
             annotation = Optional[str] if self.optional else str
+
+        if self.value is not None:
+            if annotation in (bool, Optional[bool]):
+                default = self.value.lower() == "true"
+            elif annotation in (int, Optional[int]):
+                default = int(self.value)
+            elif annotation in (float, Optional[float]):
+                default = float(self.value)
+            else:
+                default = self.value
+        else:
+            default = None if self.optional else Parameter.empty
 
         return Parameter(
             name=self.name,
             kind=Parameter.POSITIONAL_OR_KEYWORD,
+            default=default,
             annotation=Annotated[annotation, Field(description=self.description)],
         )
 

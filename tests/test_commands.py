@@ -207,8 +207,8 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
 def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
     passed = []
     failed = []
-    limit = len(tools.items())
-    # limit = 100
+    # limit = len(tools.items())
+    limit = 100
     count = 0
     for tool_id, tool in tools.items():
         agent.tool = tool

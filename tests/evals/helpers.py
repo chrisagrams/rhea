@@ -15,7 +15,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.types import CallToolResult
 from proxystore.connectors.redis import RedisConnector, RedisKey
-from agent.schema import RheaParam, RheaOutput
+from agent.schema import RheaParam, RheaOutput, RheaMultiSelectParam
 from minio import Minio
 from typing import List, Dict, Any
 
@@ -50,7 +50,13 @@ def unwrap_user_inputs(rhea_params: List[RheaParam]) -> Dict[str, Any]:
     for rp in rhea_params:
         # Get the original param name and its stored value
         name = rp.name
-        val = rp.value  # type: ignore
+        if isinstance(rp, RheaMultiSelectParam):
+            res = []
+            for v in rp.values:
+                res.append(v.value)
+            val = ",".join(res)
+        else:
+            val = rp.value  # type: ignore
 
         # If it was a data param, unwrap the RedisKey back to its string
         if rp.type == "data" and isinstance(val, RedisKey):
@@ -134,5 +140,5 @@ async def run_tool_tests(
                         logger.info("🟨 Tool executed. Tests did not pass.")
                     return mcp_output
                 else:
-                    logger.info("❌ Tool execution failed")
+                    logger.info(f"❌ Tool execution failed: {result.content}")
                     return None

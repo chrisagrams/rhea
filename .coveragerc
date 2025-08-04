@@ -1,0 +1,10 @@
+[run]
+source = .
+parallel = true
+branch = true
+
+[report]
+omit =
+    */tests/*
+    */tests/evals/*
+    */tests/mcp/*

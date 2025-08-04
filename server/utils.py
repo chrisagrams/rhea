@@ -22,10 +22,13 @@ from redis import Redis
 
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
-    res = []
-    for param in inputs.params:
-        res.append(param.to_python_parameter())
-    return res
+    params = [param.to_python_parameter() for param in inputs.params]
+
+    # Split into those without a default, and those with one to prevent 'non-default argument follows default argument'
+    no_default = [p for p in params if p.default is Parameter.empty]
+    with_default = [p for p in params if p.default is not Parameter.empty]
+
+    return no_default + with_default
 
 
 def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
@@ -78,12 +81,14 @@ def create_proxystore_function_resource(
 
 
 def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
-    params: List[Parameter] = construct_params(tool.inputs)
+    params: List[Parameter] = []
 
     # Add Context to tool params
     params.append(
         Parameter("ctx", kind=Parameter.POSITIONAL_OR_KEYWORD, annotation=Context)
     )
+
+    params += construct_params(tool.inputs)
 
     sig = Signature(parameters=params, return_annotation=MCPOutput)
 

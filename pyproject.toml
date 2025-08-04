@@ -11,6 +11,7 @@ dependencies = [
     "cachetools>=6.1.0",
     "cheetah3>=3.2.6.post1",
     "conda-pack>=0.8.1",
+    "coverage[toml]>=7.9.1",
     "debugpy>=1.8.14",
     "fastapi[standard]>=0.115.14",
     "greenlet>=3.2.3",
@@ -30,6 +31,7 @@ dependencies = [
     "shellcheck-py>=0.10.0.1",
     "sqlalchemy>=2.0.41",
     "tqdm>=4.67.1",
+    "trio>=0.30.0",
     "zstandard>=0.23.0",
 ]
 

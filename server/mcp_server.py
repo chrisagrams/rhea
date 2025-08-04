@@ -3,6 +3,7 @@ import debugpy
 import logging
 import anyio
 import uuid
+import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from mcp.server.fastmcp import Context
@@ -259,6 +260,10 @@ async def serve_sse():
 
 async def main():
     try:
+        if os.environ.get("COVERAGE_PROCESS_START"):
+            import coverage
+
+            coverage.process_startup()
         parsl.load(
             generate_parsl_config(
                 backend=settings.parsl_container_backend,
