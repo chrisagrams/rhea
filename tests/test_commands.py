@@ -113,15 +113,25 @@ def shellcheck_lint(script: str, env: dict[str, str]) -> List[Dict[str, Any]]:
 
 
 def test_simple_replace_galaxy_var_with_value(agent):
-    agent.tool = SimpleNamespace(command='echo "\\${VAR:-5}"')
+    agent.tool = SimpleNamespace(
+        command=SimpleNamespace(
+            command='echo "\\${VAR:-5}"',
+            interpreter=''
+        )
+    )
     agent.replace_galaxy_var("VAR", 10)
-    assert agent.tool.command == "echo 10"
+    assert agent.tool.command.command == "echo 10"
 
 
 def test_simple_replace_galaxy_var_with_default(agent):
-    agent.tool = SimpleNamespace(command='echo "\\${VAR:-5}"')
+    agent.tool = SimpleNamespace(
+        command=SimpleNamespace(
+            command='echo "\\${VAR:-5}"',
+            interpreter=''
+        )
+    )
     agent.replace_galaxy_var("VAR")
-    assert agent.tool.command == "echo 5"
+    assert agent.tool.command.command == "echo 5"
 
 
 def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
