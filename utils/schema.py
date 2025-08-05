@@ -281,17 +281,27 @@ class Param(BaseModel):
         else:
             annotation = Optional[str] if self.optional else str
 
+        default = None if self.optional else Parameter.empty
+
         if self.value is not None:
             if annotation in (bool, Optional[bool]):
                 default = self.value.lower() == "true"
             elif annotation in (int, Optional[int]):
-                default = int(self.value)
+                if (self.value is None or self.value == "") and self.optional:
+                    default = None
+                elif (self.value is None or self.value == "") and not self.optional:
+                    raise ValueError(f"Value is None and non-optional.")
+                else:
+                    default = int(self.value)
             elif annotation in (float, Optional[float]):
                 default = float(self.value)
             else:
                 default = self.value
         else:
-            default = None if self.optional else Parameter.empty
+            if self.type == "select" and self.options is not None:
+                for option in self.options:
+                    if option.selected:
+                        default = option.value
 
         return Parameter(
             name=self.name,
@@ -310,6 +320,9 @@ class Conditional(BaseModel):
     name: str
     param: Param
     whens: List[When]
+
+    def to_python_parameter(self) -> Parameter:
+        return self.param.to_python_parameter()
 
 
 class Section(BaseModel):

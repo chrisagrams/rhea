@@ -2,6 +2,7 @@ import re
 import unicodedata
 import asyncio
 import time
+import copy
 from mcp.server.fastmcp import Context
 from utils.schema import Tool, Inputs
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
@@ -23,6 +24,8 @@ from redis import Redis
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
     params = [param.to_python_parameter() for param in inputs.params]
+    if inputs.conditionals is not None:
+        params += [cond.to_python_parameter() for cond in inputs.conditionals]
 
     # Split into those without a default, and those with one to prevent 'non-default argument follows default argument'
     no_default = [p for p in params if p.default is Parameter.empty]
@@ -31,10 +34,10 @@ def construct_params(inputs: Inputs) -> List[Parameter]:
     return no_default + with_default
 
 
-def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
+def process_user_inputs(tool: Tool, args: dict) -> List[RheaParam]:
     res = []
 
-    for param in inputs.params:
+    for param in tool.inputs.params:
         a = args.get(param.name, None)
 
         if a is not None:
@@ -42,6 +45,29 @@ def process_user_inputs(inputs: Inputs, args: dict) -> List[RheaParam]:
                 res.append(RheaParam.from_param(param, RedisKey(a)))
             else:
                 res.append(RheaParam.from_param(param, a))
+
+    if tool.inputs.conditionals is not None:
+        for conditional in tool.inputs.conditionals:
+            value = args.get(conditional.param.name)
+            if value is not None:
+                conditional_p = RheaParam.from_param(conditional.param, value)
+                res.append(conditional_p)
+                conditional_cp = copy.copy(conditional_p)
+                conditional_cp.name = f"{conditional.name}.{conditional_p.name}"
+                res.append(conditional_cp)
+                for when in conditional.whens:
+                    if when.value == value:
+                        for p in when.params:
+                            if arg_val := args.get(p.name):
+                                if p.type == "data":
+                                    arg_val = RedisKey(redis_key=arg_val)
+                                rp = RheaParam.from_param(p, arg_val)
+                            else:
+                                rp = RheaParam.from_param(p, p.value)
+                            res.append(rp)
+                            cp = copy.copy(rp)
+                            cp.name = f"{conditional.name}.{rp.name}"
+                            res.append(cp)
 
     return res
 
@@ -119,7 +145,7 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
                 kwargs.setdefault(name, value)
 
             # Construct RheaParams
-            rhea_params = process_user_inputs(tool.inputs, kwargs)
+            rhea_params = process_user_inputs(tool, kwargs)
 
             await ctx.report_progress(0.05, 1)
 

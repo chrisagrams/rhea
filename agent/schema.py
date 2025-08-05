@@ -124,6 +124,9 @@ class RheaParam:
         elif param.type == "integer":  # RheaIntegerParam
             if isinstance(value, str):
                 try:
+                    if param.optional and value is None or value == "":
+                        param.type = "text"
+                        return RheaTextParam.from_param(param, value)
                     value = int(value)
                 except ValueError:
                     raise ValueError(
@@ -144,10 +147,14 @@ class RheaParam:
                 raise ValueError("Value must be a 'float' for float param.")
             return RheaFloatParam.from_param(param, value)
         elif param.type == "boolean":
+            if value is None and param.checked is not None:
+                value = param.checked
+            if value is None:
+                raise ValueError("Value is None.")
             if type(value) is not bool:
-                if value.lower() == "true":
+                if value.lower() == "true" or value == param.truevalue:
                     value = True
-                elif value.lower() == "false":
+                elif value.lower() == "false" or value == param.falsevalue:
                     value = False
                 else:
                     raise ValueError("Value must be a 'bool' for boolean param.")
@@ -167,6 +174,8 @@ class RheaParam:
                             return RheaSelectParam.from_param(param, option.value)
                 raise ValueError("Value must be a 'str' for select param.")
             return RheaSelectParam.from_param(param, value)
+        elif param.type == "data_column":
+            return RheaTextParam.from_param(param, value)
         raise NotImplementedError(f"Param {param.type} not implemented.")
 
 
