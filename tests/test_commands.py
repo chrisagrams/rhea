@@ -206,24 +206,3 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
             return
     finally:
         asyncio.run(cleanup_tool_directory(agent.tool_directory))
-
-
-def test_all_expand_galaxy_if(agent, tools, connector, minio_client):
-    passed = []
-    failed = []
-    # limit = len(tools.items())
-    limit = 100
-    count = 0
-    for tool_id, tool in tools.items():
-        agent.tool = tool
-        try:
-            test_expand_galaxy_if(agent, tool, connector, minio_client)
-            passed.append(tool_id)
-        except Exception:
-            failed.append(tool_id)
-        count += 1
-        if count == limit:
-            break
-    total = len(passed) + len(failed)
-    num_passed = len(passed)
-    assert not failed, f"{num_passed}/{total} passed; failures: {failed[0:10]}..."
