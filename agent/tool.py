@@ -8,6 +8,7 @@ from academy.agent import Agent, action
 from academy.logging import init_logging
 from typing import List, Optional
 from utils.schema import Tool, Param, ConfigFile
+from utils.proxy import RheaFileProxy
 from agent.schema import *
 from agent.utils import install_conda_env, configure_tool_directory
 from proxystore.connectors.redis import RedisConnector
@@ -274,16 +275,20 @@ class RheaToolAgent(Agent):
 
         for param in params:
             if isinstance(param, RheaFileParam):
-                tmp_file_path = os.path.join(input_dir, str(param.value.redis_key))
-                with open(tmp_file_path, "wb") as f:
-                    buffer = input_store.get(param.value)
-                    if buffer is not None:
-                        f.write(buffer)
-                    else:
-                        raise KeyError(f"No file associated with key {param.value}")
-                    self.logger.debug(f"Wrote '{param.value}' to '{tmp_file_path}'")
+                # Get RheaFileProxy object from Store
+                proxy_obj: RheaFileProxy = RheaFileProxy.from_proxy(
+                    RedisKey(param.value.redis_key), input_store
+                )
 
-                file_var = GalaxyFileVar(tmp_file_path, param.filename)
+                # Write content to a local temporary file
+                tmp_file_path = os.path.join(input_dir, proxy_obj.filename)
+                with open(tmp_file_path, "wb") as f:
+                    f.write(proxy_obj.contents)
+                    param.path = tmp_file_path  # Update param's local path
+                    self.logger.debug(f"Wrote '{param.value}' to '{param.path}'")
+
+                # Convert RheaParam to GalaxyFileVar for Cheetah
+                file_var: GalaxyFileVar = param.to_galaxy()
 
                 if param.name in env:
                     if isinstance(env[param.name], list):

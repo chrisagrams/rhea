@@ -1,9 +1,11 @@
+from __future__ import annotations
 import os
 import re
 import glob
 from typing import Any, List, Optional
 from dataclasses import dataclass
 from utils.schema import Param, CollectionOutput
+from utils.proxy import RheaFileProxy
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
@@ -188,11 +190,13 @@ class RheaFileParam(RheaParam):
         value: RedisKey,
         argument: str | None = None,
         filename: str | None = None,
+        path: str | None = None,
     ) -> None:
         super().__init__(name, type, argument)
         self.format = format
         self.value = value
         self.filename = filename
+        self.path = path
 
     def __str__(self) -> str:
         arg = f", argument={self.argument!r}" if self.argument is not None else ""
@@ -209,6 +213,12 @@ class RheaFileParam(RheaParam):
         if param.name is None or param.type is None or param.format is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, format=param.format, value=value)
+
+    def to_galaxy(self) -> GalaxyFileVar:
+        if self.path is None:
+            raise ValueError("Path was not initialized in 'RheaFileParam")
+
+        return GalaxyFileVar(path=self.path, filename=self.filename)
 
 
 class RheaBooleanParam(RheaParam):
@@ -241,7 +251,7 @@ class RheaBooleanParam(RheaParam):
     __repr__ = __str__
 
     @classmethod
-    def from_param(cls, param: Param, value: bool) -> "RheaBooleanParam":
+    def from_param(cls, param: Param, value: bool) -> RheaBooleanParam:
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         if param.value is None and param.checked is None:
@@ -274,7 +284,7 @@ class RheaTextParam(RheaParam):
     __repr__ = __str__
 
     @classmethod
-    def from_param(cls, param: Param, value: str) -> "RheaTextParam":
+    def from_param(cls, param: Param, value: str) -> RheaTextParam:
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         if param.value is None and param.optional:
@@ -311,7 +321,7 @@ class RheaIntegerParam(RheaParam):
     @classmethod
     def from_param(
         cls, param: Param, value: int, min: int | None = None, max: int | None = None
-    ) -> "RheaIntegerParam":
+    ) -> RheaIntegerParam:
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value, min=min, max=max)
@@ -350,7 +360,7 @@ class RheaFloatParam(RheaParam):
         value: float,
         min: float | None = None,
         max: float | None = None,
-    ) -> "RheaFloatParam":
+    ) -> RheaFloatParam:
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         return cls(name=param.name, type=param.type, value=value, min=min, max=max)
@@ -370,7 +380,7 @@ class RheaSelectParam(RheaParam):
     __repr__ = __str__
 
     @classmethod
-    def from_param(cls, param: Param, value: str) -> "RheaSelectParam":
+    def from_param(cls, param: Param, value: str) -> RheaSelectParam:
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         if param.options is None:
@@ -405,7 +415,7 @@ class RheaMultiSelectParam(RheaParam):
     __repr__ = __str__
 
     @classmethod
-    def from_param(cls, param: Param, value: List[str]) -> "RheaMultiSelectParam":
+    def from_param(cls, param: Param, value: List[str]) -> RheaMultiSelectParam:
         if param.name is None or param.type is None:
             raise ValueError("Required fields are 'None'")
         res = []
@@ -439,15 +449,23 @@ class RheaDataOutput:
         store: Store[RedisConnector],
         name: Optional[str] = None,
         format: Optional[str] = None,
-    ) -> "RheaDataOutput":
-        with open(filepath, "rb") as f:
-            buffer = f.read()
-            proxy = store.proxy(buffer)
-            key = get_key(proxy)
+    ) -> RheaDataOutput:
+        proxy: RheaFileProxy = RheaFileProxy.from_file(filepath)
 
-        size = os.path.getsize(filepath)
-        filename = os.path.basename(filepath)
-        return cls(key=key, size=size, filename=filename, name=name, format=format)  # type: ignore
+        if name is not None:
+            proxy.name = name
+        if format is not None:
+            proxy.format = format
+
+        key = proxy.to_proxy(store)
+
+        return cls(
+            key=RedisKey(redis_key=key),
+            size=proxy.filesize,
+            filename=proxy.filename,
+            name=proxy.name,
+            format=proxy.format,
+        )
 
 
 class RheaOutput:

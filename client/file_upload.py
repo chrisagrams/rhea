@@ -1,6 +1,10 @@
+import os
+
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+
+from utils.proxy import RheaFileProxy
 from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Upload files to ProxyStore")
@@ -17,11 +21,9 @@ connector = RedisConnector(args.hostname, args.port)
 
 
 def upload_file(filepath: str, store: Store[RedisConnector]) -> str:
-    with open(filepath, "rb") as f:
-        buffer = f.read()
-        proxy = store.proxy(buffer)
-        key = get_key(proxy)
-        return str(key.redis_key)  # type: ignore
+    proxy: RheaFileProxy = RheaFileProxy.from_file(filepath)
+    key = proxy.to_proxy(store)
+    return key
 
 
 if __name__ == "__main__":
