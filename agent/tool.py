@@ -285,6 +285,7 @@ class RheaToolAgent(Agent):
                 with open(tmp_file_path, "wb") as f:
                     f.write(proxy_obj.contents)
                     param.path = tmp_file_path  # Update param's local path
+                    param.filename = os.path.basename(param.path)
                     self.logger.debug(f"Wrote '{param.value}' to '{param.path}'")
 
                 # Convert RheaParam to GalaxyFileVar for Cheetah

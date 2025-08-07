@@ -1,7 +1,9 @@
+import os
 from typing import List, Any
 from utils.schema import Tool, Test, Param, Conditional, Section
+from utils.proxy import RheaFileProxy
 from agent.schema import RheaParam, RheaOutput, RheaDataOutput, RheaFileParam
-from proxystore.connectors.redis import RedisConnector
+from proxystore.connectors.redis import RedisConnector, RedisKey
 from proxystore.store import Store
 from minio import Minio
 from proxystore.store.utils import get_key
@@ -39,8 +41,10 @@ def get_test_file_from_store(
             with Store("rhea-input", fc.connector, register=True) as input_store:
                 resp = fc.minio_client.get_object(fc.bucket, object_name)
                 content = resp.read()
-                proxy = input_store.proxy(content)
-                key = get_key(proxy)
+                proxy: RheaFileProxy = RheaFileProxy.from_buffer(
+                    os.path.basename(object_name), content
+                )
+                key = RedisKey(redis_key=proxy.to_proxy(input_store))
                 p = RheaParam.from_param(input_param, key)
                 if isinstance(p, RheaFileParam):
                     p.filename = object_name.split("/")[-1]

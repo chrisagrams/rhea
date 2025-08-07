@@ -71,6 +71,16 @@ class RheaFileProxy(BaseModel):
             contents=contents,
         )
 
+    @classmethod
+    def from_buffer(cls, name: str, contents: bytes) -> RheaFileProxy:
+        return cls(
+            name=name,
+            format=get_file_format(contents),
+            filename=name,
+            filesize=len(contents),
+            contents=contents,
+        )
+
     def to_proxy(self, store: Store) -> str:
         proxy = store.proxy(self)
         key = get_key(proxy)
