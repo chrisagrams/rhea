@@ -307,7 +307,8 @@ def assert_tool_tests(
                 if out.assert_contents is None:  # No need to assert contents
                     return True
                 else:
-                    buffer = store.get(output.key)
+                    proxy = RheaFileProxy.from_proxy(key=output.key, store=store)
+                    buffer = proxy.contents
                     if buffer is not None:
                         try:
                             out.assert_contents.run_all(buffer)
