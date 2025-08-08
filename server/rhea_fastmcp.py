@@ -20,7 +20,7 @@ from utils.schema import Tool as GalaxyTool
 from utils.models import get_galaxytool_by_name
 from redis import Redis
 from pydantic import AnyUrl, BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from server.client_manager import ClientManager, ClientState
 
 logger = get_logger(__name__)
@@ -226,8 +226,12 @@ class RheaToolManager(ToolManager):
             raise RuntimeError(f"'context' is None")
         tool = self.get_tool(name)
         if not tool:
-            session: AsyncSession = context.request_context.lifespan_context.db_session  # type: ignore
-            t: GalaxyTool | None = await get_galaxytool_by_name(session, name)
+            db_sessionmaker: async_sessionmaker[AsyncSession] = (
+                context.request_context.lifespan_context.db_sessionmaker  # type: ignore
+            )
+            async with db_sessionmaker() as session:
+                t: GalaxyTool | None = await get_galaxytool_by_name(session, name)
+
             if t is None:
                 raise ToolError(f"Unknown tool: { name }")
             tool = create_tool(t, ctx=context)

@@ -113,7 +113,7 @@ class AppContext:
     settings: Settings
     logger: Logger
     embedding_client: OpenAI
-    db_session: AsyncSession
+    db_sessionmaker: async_sessionmaker[AsyncSession]
     factory: RedisExchangeFactory
     connector: RedisConnector
     output_store: Store

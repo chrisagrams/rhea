@@ -107,13 +107,11 @@ async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
             name=f"rhea-manager-{str(uuid.uuid4())}"
         )
 
-        db_session: AsyncSession = AsyncSessionLocal()
-
         yield AppContext(
             settings=settings,
             logger=logger,
             embedding_client=embedding_client,
-            db_session=db_session,
+            db_sessionmaker=AsyncSessionLocal,
             factory=factory,
             connector=connector,
             output_store=output_store,
@@ -177,8 +175,12 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     )
 
     # Perform RAG
-    session: AsyncSession = ctx.request_context.lifespan_context.db_session
-    tools: List[Tool] = await get_l2_distance(query_vector, session, limit=10)
+    db_sessionmaker: async_sessionmaker[AsyncSession] = (
+        ctx.request_context.lifespan_context.db_sessionmaker
+    )
+
+    async with db_sessionmaker() as session:
+        tools: List[Tool] = await get_l2_distance(query_vector, session, limit=10)
 
     result = []
 

@@ -18,7 +18,7 @@ from inspect import Signature, Parameter
 from manager.launch_agent import launch_agent
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from pydantic import AnyUrl
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from redis import Redis
 
 
@@ -140,9 +140,12 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
 
             run_id = ctx.request_context.lifespan_context.run_id
 
-            session: AsyncSession = ctx.request_context.lifespan_context.db_session
+            db_sessionmaker: async_sessionmaker[AsyncSession] = (
+                ctx.request_context.lifespan_context.db_sessionmaker
+            )
 
-            tool: Tool | None = await get_galaxytool_by_id(session, tool_id)
+            async with db_sessionmaker() as session:
+                tool: Tool | None = await get_galaxytool_by_id(session, tool_id)
 
             if tool is None:
                 raise RuntimeError(f"No tool found with ID: {tool_id}")
