@@ -2,13 +2,14 @@ from __future__ import annotations
 import os
 import re
 import glob
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from dataclasses import dataclass
 from utils.schema import Param, CollectionOutput
 from utils.proxy import RheaFileProxy
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+from collections.abc import Mapping, MutableMapping
 
 
 class GalaxyFileVar:
@@ -52,46 +53,109 @@ class GalaxyFileVar:
 
 
 class GalaxyVar:
-    def __init__(self, value):
-        self._value = value if value is not None else {}
+    def __init__(self, value=None):
+        self._value = {} if value is None else value
         self._nested = {}
 
     def __str__(self):
-        if self._value is None:
+        v = self._value
+        if v is None:
             return ""
-        return str(self._value)
+        if isinstance(v, (list, tuple)):
+            return " ".join(str(x) for x in v)
+        return str(v)
 
-    def set_nested(self, key: str, value):
-        self._nested[key] = value
+    def _wrap(self, v):
+        if isinstance(v, (GalaxyVar, GalaxyFileVar)):
+            return v
+        if isinstance(v, (list, tuple, Mapping)):
+            return GalaxyVar(v)
+        return v
+
+    def set_nested(self, key: str, value: Any):
+        parts = key.split(".")
+        cur: GalaxyVar = self
+        for i, p in enumerate(parts):
+            last = i == len(parts) - 1
+            if last:
+                v = (
+                    value
+                    if isinstance(value, (GalaxyVar, GalaxyFileVar))
+                    else (
+                        GalaxyVar(value)
+                        if isinstance(value, (list, tuple, Mapping))
+                        else value
+                    )
+                )
+                cur._nested[p] = v
+                if isinstance(cur._value, MutableMapping):
+                    cast(MutableMapping[str, Any], cur._value)[p] = v
+            else:
+                nxt = cur._nested.get(p)
+                if not isinstance(nxt, GalaxyVar):
+                    nxt = GalaxyVar({})
+                    cur._nested[p] = nxt
+                    if isinstance(cur._value, MutableMapping):
+                        cast(MutableMapping[str, Any], cur._value)[p] = nxt
+                cur = nxt
 
     def __getattr__(self, name):
         if name in self._nested:
             return self._nested[name]
-        if hasattr(self._value, name):
-            attr = getattr(self._value, name)
-            if callable(attr):
-                return attr
-            return attr
+        v = self._value
+        if isinstance(v, Mapping) and name in v:
+            return v[name]
+        if hasattr(v, name):
+            return getattr(v, name)
         return ""
 
+    def __getitem__(self, key):
+        if key in self._nested:
+            return self._nested[key]
+        v = self._value
+        if isinstance(v, Mapping) and key in v:
+            return v[key]
+        if isinstance(v, (list, tuple)) and (
+            isinstance(key, int) or isinstance(key, slice)
+        ):
+            return v[key]
+        try:
+            return v[key]
+        except Exception:
+            return ""
+
+    def __setitem__(self, key, value):
+        self.set_nested(str(key), value)
+
     def __iter__(self):
-        return iter(self._value)
+        try:
+            return iter(self._value)
+        except TypeError:
+            return iter(())
 
     def __len__(self):
-        return len(self._value)
-
-    def __getitem__(self, key):
-        return self._value[key]
+        try:
+            return len(self._value)
+        except TypeError:
+            return 0
 
     def __contains__(self, item):
-        return item in self._value
+        if item in self._nested:
+            return True
+        v = self._value
+        if isinstance(v, Mapping):
+            return item in v
+        try:
+            return item in v
+        except TypeError:
+            return False
 
     def __bool__(self):
-        return bool(self._value)
+        return bool(self._value) or bool(self._nested)
 
     def __eq__(self, other):
         if isinstance(other, GalaxyVar):
-            return self._value == other._value
+            return self._value == other._value and self._nested == other._nested
         return self._value == other
 
 

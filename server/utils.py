@@ -25,7 +25,15 @@ from redis import Redis
 def construct_params(inputs: Inputs) -> List[Parameter]:
     params = [param.to_python_parameter() for param in inputs.params]
     if inputs.conditionals is not None:
-        params += [cond.to_python_parameter() for cond in inputs.conditionals]
+        for cond in inputs.conditionals:
+            params.extend(cond.to_python_parameter())
+
+    # Deduplicate by name, preserving first occurrence
+    seen = {}
+    for p in params:
+        if p.name not in seen:
+            seen[p.name] = p
+    params = list(seen.values())
 
     # Split into those without a default, and those with one to prevent 'non-default argument follows default argument'
     no_default = [p for p in params if p.default is Parameter.empty]

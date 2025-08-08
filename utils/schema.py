@@ -294,7 +294,12 @@ class Param(BaseModel):
                 else:
                     default = int(self.value)
             elif annotation in (float, Optional[float]):
-                default = float(self.value)
+                if (self.value is None or self.value == "") and self.optional:
+                    default = None
+                elif (self.value is None or self.value == "") and not self.optional:
+                    raise ValueError(f"Value is None and non-optional.")
+                else:
+                    default = float(self.value)
             else:
                 default = self.value
         else:
@@ -321,8 +326,17 @@ class Conditional(BaseModel):
     param: Param
     whens: List[When]
 
-    def to_python_parameter(self) -> Parameter:
-        return self.param.to_python_parameter()
+    def to_python_parameter(self) -> List[Parameter]:
+        result: List[Parameter] = []
+        self.param.optional = True  # Conditional params are optional in some contexts yet not specified as optional (ex. 10x_bamtofastq)
+        result.append(self.param.to_python_parameter())
+
+        for when in self.whens:
+            for param in when.params:
+                param.optional = True
+                result.append(param.to_python_parameter())
+
+        return result
 
 
 class Section(BaseModel):

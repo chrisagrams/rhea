@@ -158,16 +158,22 @@ class RheaToolAgent(Agent):
         return self.tool.command.command
 
     def expand_galaxy_if(self, cmd: str, env: dict[str, Any]) -> str:
-        var_pattern = re.compile(r"\$\{?([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\}?")
-        vars_ = sorted(
-            set(var_pattern.findall(cmd)), key=lambda v: v.count("."), reverse=True
+        var_pattern = re.compile(
+            r"\$\{?([A-Za-z_]\w*(?:\.(?:[A-Za-z_]\w*)|\[['\"][^'\"\]]+['\"]\])*)\}?"
         )
-        nested_roots = {v.split(".")[0] for v in vars_ if "." in v}
+        vars_ = sorted(
+            {m.group(1) for m in var_pattern.finditer(cmd)},
+            key=lambda v: v.count(".") + v.count("["),
+            reverse=True,
+        )
+        nested_roots = {
+            re.split(r"[.\[]", v)[0] for v in vars_ if ("." in v or "[" in v)
+        }
 
         context: dict[str, Any] = {}
         for k, v in env.items():
             if "." not in k:
-                if isinstance(v, (list, GalaxyFileVar)):
+                if isinstance(v, GalaxyFileVar):
                     context[k] = v
                 else:
                     context[k] = GalaxyVar(v)
@@ -176,35 +182,31 @@ class RheaToolAgent(Agent):
             if "." in k:
                 root, rest = k.split(".", 1)
                 if root not in context:
-                    context[root] = GalaxyVar("")
-
+                    context[root] = GalaxyVar({})
                 if isinstance(context[root], GalaxyVar):
                     context[root].set_nested(rest, v)
 
         for var in vars_:
-            parts = var.split(".")
-            if len(parts) == 1:
-                root = parts[0]
+            has_nesting = ("." in var) or ("[" in var)
+            root = re.split(r"[.\[]", var)[0]
+            if not has_nesting:
                 if root not in nested_roots and root not in context:
                     context[root] = GalaxyVar("")
             else:
-                # Handle multi-level nesting
-                root = parts[0]
                 if root not in context:
-                    context[root] = GalaxyVar("")
-
-                # Build the nested structure level by level
-                current = context[root]
-                for i in range(1, len(parts)):
-                    nested_key = parts[i]
-                    if isinstance(current, GalaxyVar):
-                        if nested_key not in current._nested:
-                            # If this is the last part, set empty string, otherwise create new GalaxyVar
-                            if i == len(parts) - 1:
-                                current.set_nested(nested_key, "")
-                            else:
-                                current.set_nested(nested_key, GalaxyVar(""))
-                        current = current._nested[nested_key]
+                    context[root] = GalaxyVar({})
+                if "." in var:
+                    parts = var.split(".")
+                    current = context[root]
+                    for i in range(1, len(parts)):
+                        nested_key = parts[i]
+                        if isinstance(current, GalaxyVar):
+                            if nested_key not in current._nested:
+                                if i == len(parts) - 1:
+                                    current.set_nested(nested_key, "")
+                                else:
+                                    current.set_nested(nested_key, GalaxyVar({}))
+                            current = current._nested[nested_key]
 
         tmpl = Template(source=cmd, searchList=[context])
         return tmpl.respond()

@@ -2,7 +2,13 @@ import os
 from typing import List, Any
 from utils.schema import Tool, Test, Param, Conditional, Section
 from utils.proxy import RheaFileProxy
-from agent.schema import RheaParam, RheaOutput, RheaDataOutput, RheaFileParam
+from agent.schema import (
+    RheaParam,
+    RheaOutput,
+    RheaDataOutput,
+    RheaFileParam,
+    RheaSelectParam,
+)
 from proxystore.connectors.redis import RedisConnector, RedisKey
 from proxystore.store import Store
 from minio import Minio
@@ -137,7 +143,7 @@ def process_inputs(
 
     # Params
     # The old way of doing repeats is with a "|" split, where LHS is the index and RHS is the actual param name
-    test_map = {
+    test_map: dict[str, Param] = {
         p.name.split("|")[-1]: p for p in (test.params or []) if p.name is not None
     }
     for input_param in tool.inputs.params:
@@ -240,6 +246,10 @@ def process_inputs(
                                 if when_param.name is not None:
                                     second_param = test_map.get(when_param.name)
                                     if second_param:
+                                        if when_param.type == "select":
+                                            # If its a select, propagate the options list
+                                            second_param.options = when_param.options
+                                            second_param.multiple = when_param.multiple
                                         tool_params.extend(
                                             populate_regular_and_conditional(
                                                 second_param,
