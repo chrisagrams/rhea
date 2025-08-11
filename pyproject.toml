@@ -31,6 +31,7 @@ dependencies = [
     "pytest-cov>=6.2.1",
     "pytest-xdist>=3.8.0",
     "python-magic>=0.4.27",
+    "requests>=2.32.4",
     "shellcheck-py>=0.10.0.1",
     "sqlalchemy>=2.0.41",
     "tqdm>=4.67.1",
