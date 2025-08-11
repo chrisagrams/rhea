@@ -1,17 +1,4 @@
 services:
-  server:
-    image: chrisagrams/rhea-server:latest
-    container_name: rhea-server
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock # Allow the server to execute Docker agents
-    env_file:
-        - .env.docker
-
   redis:
     image: redis:7
     container_name: rhea-redis
@@ -30,10 +17,10 @@ services:
     image: minio/minio:latest
     container_name: rhea-minio
     volumes:
-      - ./data/minio:/data
+      - minio-data:/data
     ports:
-      - "9090:9000"
-      - "9091:9001"
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER:     admin
       MINIO_ROOT_PASSWORD: password
@@ -53,13 +40,21 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   embedding:
-    image: ghcr.io/huggingface/text-embeddings-inference:1.7
+    image: ghcr.io/huggingface/text-embeddings-inference:1.8
+    container_name: rhea-embedding
     restart: unless-stopped
     volumes:
       - text-embeddings-data:/data
     ports:
       - "8000:80"
     command: ["--model-id", "Qwen/Qwen3-Embedding-0.6B"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   redis-data:
@@ -68,3 +63,5 @@ volumes:
     name: rhea-postgres-data
   text-embeddings-data:
     name: rhea-text-embeddings-data
+  minio-data:
+    name: rhea-minio-data
