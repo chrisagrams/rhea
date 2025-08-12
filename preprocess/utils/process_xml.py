@@ -16,5 +16,3 @@ def classify_xml_type(xml_bytes: bytes | str) -> str | None:
     if tag not in ("tool", "macros", "repositories"):
         return None
     return tag
-
-

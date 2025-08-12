@@ -189,7 +189,9 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
                     )
 
                     unbound_handle: UnboundRemoteHandle | None = (
-                        await get_handle_from_redis(tool.id, run_id, r, timeout=30)
+                        await get_handle_from_redis(
+                            tool.id, run_id, r, timeout=settings.agent_handle_timeout
+                        )
                     )
 
                     if unbound_handle is None:

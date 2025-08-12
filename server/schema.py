@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     parsl_nodes_per_block: int = 1
     parsl_parallelism: int = 1
 
+    # Time to wait to retrieve handle from agent
+    agent_handle_timeout: int = 30
+
     redis_host: str = "localhost"
     redis_port: int = 6379
 
