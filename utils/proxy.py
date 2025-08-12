@@ -4,6 +4,7 @@ from pydantic import BaseModel, PrivateAttr
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+import cloudpickle
 
 import os
 import logging
@@ -49,10 +50,10 @@ class RheaFileProxy(BaseModel):
 
     @classmethod
     def from_proxy(cls, key: RedisKey, store: Store) -> RheaFileProxy:
-        obj: RheaFileProxy | None = store.get(key)
-        if obj is None:
+        data = store.get(key, deserializer=cloudpickle.loads)
+        if data is None:
             raise ValueError(f"Key '{key}' not in store")
-        return obj
+        return cls.model_validate(data)
 
     @classmethod
     def from_file(cls, path: str) -> RheaFileProxy:
@@ -82,6 +83,6 @@ class RheaFileProxy(BaseModel):
         )
 
     def to_proxy(self, store: Store) -> str:
-        proxy = store.proxy(self)
+        proxy = store.proxy(self.model_dump(), serializer=cloudpickle.dumps)
         key = get_key(proxy)
         return key.redis_key  # type: ignore

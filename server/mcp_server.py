@@ -6,12 +6,14 @@ import uuid
 import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.resources.types import TextResource
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.server.sse import SseServerTransport
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
+
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
 from academy.logging import init_logging
@@ -30,8 +32,11 @@ from server.utils import create_tool
 from utils.embedding import get_embedding, get_l2_distance
 from manager.parsl_config import generate_parsl_config
 from typing import List, Optional, Any
+
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
+import cloudpickle
+
 from pydantic.networks import AnyUrl
 from pydantic import ValidationError
 from argparse import ArgumentParser
@@ -75,7 +80,13 @@ if settings.debug_port is not None:
 run_id = str(uuid.uuid4())
 
 connector = RedisConnector(settings.redis_host, settings.redis_port)
-output_store = Store("rhea-output", connector=connector, register=True)
+output_store = Store(
+    "rhea-output",
+    connector=connector,
+    register=True,
+    serializer=cloudpickle.dumps,
+    deserializer=cloudpickle.loads,
+)
 
 client_manager = LocalClientManager(client_ttl=settings.client_ttl)
 

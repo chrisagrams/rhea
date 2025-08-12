@@ -9,8 +9,11 @@ from agent.schema import (
     RheaFileParam,
     RheaSelectParam,
 )
+
 from proxystore.connectors.redis import RedisConnector, RedisKey
 from proxystore.store import Store
+import cloudpickle
+
 from minio import Minio
 from proxystore.store.utils import get_key
 
@@ -44,7 +47,13 @@ def get_test_file_from_store(
             continue
         relative_path = object_name[len(prefix) :]
         if test_param.value in relative_path:
-            with Store("rhea-input", fc.connector, register=True) as input_store:
+            with Store(
+                "rhea-input",
+                fc.connector,
+                register=True,
+                serializer=cloudpickle.dumps,
+                deserializer=cloudpickle.loads,
+            ) as input_store:
                 resp = fc.minio_client.get_object(fc.bucket, object_name)
                 content = resp.read()
                 proxy: RheaFileProxy = RheaFileProxy.from_buffer(
@@ -333,7 +342,13 @@ def assert_tool_tests(
 def process_outputs(
     tool: Tool, test: Test, connector: RedisConnector, outputs: RheaOutput
 ) -> bool:
-    with Store("rhea-output", connector, register=True) as output_store:
+    with Store(
+        "rhea-output",
+        connector,
+        register=True,
+        serializer=cloudpickle.dumps,
+        deserializer=cloudpickle.loads,
+    ) as output_store:
         if outputs.files is not None:
             for result in outputs.files:
                 if not assert_tool_tests(tool, test, result, output_store):

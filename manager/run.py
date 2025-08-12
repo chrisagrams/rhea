@@ -7,9 +7,12 @@ from agent.schema import RheaParam
 from manager.parsl_config import generate_parsl_config
 from manager.launch_agent import launch_agent
 from manager.utils import get_handle_from_redis
+
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+import cloudpickle
+
 import pickle
 import logging
 import parsl
@@ -28,7 +31,13 @@ async def main():
         tool = tools["204bd0ff6499fcca"]
         connector = RedisConnector("localhost", 6379)
 
-        with Store("rhea-input", connector, register=True) as input_store:
+        with Store(
+            "rhea-input",
+            connector,
+            register=True,
+            serializer=cloudpickle.dumps,
+            deserializer=cloudpickle.loads,
+        ) as input_store:
             with open("test_files/test.csv", "rb") as f:
                 buffer = f.read()
                 proxy = input_store.proxy(buffer)
@@ -77,7 +86,13 @@ async def main():
                 print(packages)
 
                 for result in tool_result.files:
-                    with Store("rhea-output", connector, register=True) as output_store:
+                    with Store(
+                        "rhea-output",
+                        connector,
+                        register=True,
+                        serializer=cloudpickle.dumps,
+                        deserializer=cloudpickle.loads,
+                    ) as output_store:
                         result = output_store.get(result.key)
                         print(result)
 

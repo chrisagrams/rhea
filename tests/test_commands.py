@@ -11,8 +11,11 @@ from agent.tool import RheaToolAgent
 from agent.utils import configure_tool_directory, cleanup_tool_directory
 from utils.schema import Tool, Test
 from utils.process import process_inputs
+
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
+import cloudpickle
+
 from typing import List, Dict, Any
 from minio import Minio
 
@@ -144,8 +147,20 @@ def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
         agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
     )
     with (
-        Store("rhea-test-input", connector, register=True) as input_store,
-        Store("rhea-test-output", connector, register=True) as output_store,
+        Store(
+            "rhea-test-input",
+            connector,
+            register=True,
+            serializer=cloudpickle.dumps,
+            deserializer=cloudpickle.loads,
+        ) as input_store,
+        Store(
+            "rhea-test-output",
+            connector,
+            register=True,
+            serializer=cloudpickle.dumps,
+            deserializer=cloudpickle.loads,
+        ) as output_store,
     ):
         env = os.environ.copy()
         agent.build_env_parameters(
@@ -178,8 +193,20 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
             agent.tool, sample_tool.tests.tests[0], connector, minio_client, "dev"
         )
         with (
-            Store("rhea-test-input", connector, register=True) as input_store,
-            Store("rhea-test-output", connector, register=True) as output_store,
+            Store(
+                "rhea-test-input",
+                connector,
+                register=True,
+                serializer=cloudpickle.dumps,
+                deserializer=cloudpickle.loads,
+            ) as input_store,
+            Store(
+                "rhea-test-output",
+                connector,
+                register=True,
+                serializer=cloudpickle.dumps,
+                deserializer=cloudpickle.loads,
+            ) as output_store,
         ):
             env = os.environ.copy()
             agent.build_env_parameters(

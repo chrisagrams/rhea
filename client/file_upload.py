@@ -3,6 +3,7 @@ import os
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+import cloudpickle
 
 from utils.proxy import RheaFileProxy
 from argparse import ArgumentParser
@@ -27,6 +28,12 @@ def upload_file(filepath: str, store: Store[RedisConnector]) -> str:
 
 
 if __name__ == "__main__":
-    with Store(args.store_name, connector, register=True) as store:
+    with Store(
+        args.store_name,
+        connector,
+        register=True,
+        serializer=cloudpickle.dumps,
+        deserializer=cloudpickle.loads,
+    ) as store:
         result = upload_file(args.input_file, store)
         print(f"{result}")

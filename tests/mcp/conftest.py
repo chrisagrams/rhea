@@ -20,6 +20,7 @@ from mcp.client.sse import sse_client
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+import cloudpickle
 
 from minio import Minio
 
@@ -142,7 +143,13 @@ def input_proxystore():
         os.environ.get("REDIS_HOST", "localhost"),
         int(os.environ.get("REDIS_PORT", "6379")),
     )
-    with Store("rhea-input", connector, register=True) as store:
+    with Store(
+        "rhea-input",
+        connector,
+        register=True,
+        serializer=cloudpickle.dumps,
+        deserializer=cloudpickle.loads,
+    ) as store:
         yield store
 
 

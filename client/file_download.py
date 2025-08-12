@@ -1,6 +1,7 @@
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
+import cloudpickle
 
 import os
 from argparse import ArgumentParser
@@ -33,6 +34,12 @@ def download_file(key: RedisKey, path: str, store: Store[RedisConnector]) -> str
 
 
 if __name__ == "__main__":
-    with Store(args.store_name, connector, register=True) as store:
+    with Store(
+        args.store_name,
+        connector,
+        register=True,
+        serializer=cloudpickle.dumps,
+        deserializer=cloudpickle.loads,
+    ) as store:
         redis_key = RedisKey(redis_key=args.key)
         print(download_file(redis_key, args.output_path, store))

@@ -11,8 +11,11 @@ from utils.schema import Tool, Param, ConfigFile
 from utils.proxy import RheaFileProxy
 from agent.schema import *
 from agent.utils import install_conda_env, configure_tool_directory
+
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
+import cloudpickle
+
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from minio import Minio
 from urllib3 import PoolManager
@@ -66,9 +69,19 @@ class RheaToolAgent(Agent):
 
     async def agent_on_startup(self) -> None:
         # Initialize ProxyStore
-        self.input_store = Store("rhea-input", connector=self.connector, register=True)
+        self.input_store = Store(
+            "rhea-input",
+            connector=self.connector,
+            register=True,
+            serializer=cloudpickle.dumps,
+            deserializer=cloudpickle.loads,
+        )
         self.output_store = Store(
-            "rhea-output", connector=self.connector, register=True
+            "rhea-output",
+            connector=self.connector,
+            register=True,
+            serializer=cloudpickle.dumps,
+            deserializer=cloudpickle.loads,
         )
 
         # Create coroutine to create Conda environment and install Conda packages
@@ -355,101 +368,113 @@ class RheaToolAgent(Agent):
     async def run_tool(self, params: List[RheaParam]) -> RheaOutput:
         await self._startup_done.wait()  # Wait until startup is complete.
 
-        if self.input_store is None or self.output_store is None:
-            raise RuntimeError("ProxyStore not configured.")
+        try:
+            if self.input_store is None or self.output_store is None:
+                raise RuntimeError("ProxyStore not configured.")
 
-        self.logger.info(f"Running tool with params: {params}")
-        self.logger.debug(f"self.tool_directory: {self.tool_directory}")
-        env = os.environ.copy()
+            self.logger.info(f"Running tool with params: {params}")
+            self.logger.debug(f"self.tool_directory: {self.tool_directory}")
+            env = os.environ.copy()
 
-        with TemporaryDirectory() as input, TemporaryDirectory() as output:
-            cwd = output
+            with TemporaryDirectory() as input, TemporaryDirectory() as output:
+                cwd = output
 
-            # Populate input environment variables and pull input files in a seperate thread
-            await asyncio.to_thread(
-                self.build_env_parameters,
-                env,
-                params,
-                self.tool.inputs.params,
-                input,
-                self.input_store,
-            )
-
-            # Configure outputs
-            self.build_output_env_parameters(env, output)
-
-            # Configure configfiles (if any)
-            if (
-                self.tool.configfiles is not None
-                and self.tool.configfiles.configfiles is not None
-            ):
-                for configfile in self.tool.configfiles.configfiles:
-                    self.build_configfile(env, configfile)
-
-            # Configure command script
-            cmd = self.apply_interpreter_command()
-            cmd = self.expand_galaxy_if(cmd, env)
-            cmd = cmd.replace("\n", " ")
-            cmd = self.unescape_bash_vars(cmd)
-            cmd = self.fix_var_quotes(cmd)
-            cmd = self.quote_shell_params(cmd)
-            cmd = self.replace_dotted_vars(cmd)
-
-            with NamedTemporaryFile("w", suffix=".sh", delete=False) as tf:
-                script_path = tf.name
-                tf.write("#!/usr/bin/env bash\n")
-                tf.write(cmd + "\n")
-                os.chmod(script_path, 0o755)
-
-            # Remove any objects from environment
-            for k, v in env.items():
-                if isinstance(v, list):
-                    env[k] = str(v)
-                elif isinstance(v, GalaxyVar):
-                    env[k] = str(v)
-                elif isinstance(v, GalaxyFileVar):
-                    env[k] = str(v)
-
-            # Run tool
-            cmd = [
-                "conda",
-                "run",
-                "-n",
-                self.tool.id,
-                "--no-capture-output",
-                "bash",
-                script_path,
-            ]
-            self.logger.info(f"Running subprocess: {cmd}")
-            result = await asyncio.to_thread(
-                subprocess.run,
-                cmd,
-                env=env,
-                cwd=env["__tool_directory__"],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                self.logger.error(
-                    f"Error in running tool command: \n{result.stdout}\n{result.stderr}"
+                # Populate input environment variables and pull input files in a seperate thread
+                await asyncio.to_thread(
+                    self.build_env_parameters,
+                    env,
+                    params,
+                    self.tool.inputs.params,
+                    input,
+                    self.input_store,
                 )
-                raise Exception(f"Error in running tool command: {result.stderr}")
 
-            # Get outputs
-            outputs = RheaOutput(
-                return_code=result.returncode,
-                stdout=result.stdout,
-                stderr=result.stderr,
-            )
+                # Configure outputs
+                self.build_output_env_parameters(env, output)
 
-            if self.tool.outputs.data is not None:
-                outputs.files = []
-                for out in self.tool.outputs.data:
-                    if out.from_work_dir is not None:
-                        if (
-                            out.filters is not None
-                        ):  # TODO: Actually apply the filters, for now just best-effort try to copy the file
-                            try:
+                # Configure configfiles (if any)
+                if (
+                    self.tool.configfiles is not None
+                    and self.tool.configfiles.configfiles is not None
+                ):
+                    for configfile in self.tool.configfiles.configfiles:
+                        self.build_configfile(env, configfile)
+
+                # Configure command script
+                cmd = self.apply_interpreter_command()
+                cmd = self.expand_galaxy_if(cmd, env)
+                cmd = cmd.replace("\n", " ")
+                cmd = self.unescape_bash_vars(cmd)
+                cmd = self.fix_var_quotes(cmd)
+                cmd = self.quote_shell_params(cmd)
+                cmd = self.replace_dotted_vars(cmd)
+
+                with NamedTemporaryFile("w", suffix=".sh", delete=False) as tf:
+                    script_path = tf.name
+                    tf.write("#!/usr/bin/env bash\n")
+                    tf.write(cmd + "\n")
+                    os.chmod(script_path, 0o755)
+
+                # Remove any objects from environment
+                for k, v in env.items():
+                    if isinstance(v, list):
+                        env[k] = str(v)
+                    elif isinstance(v, GalaxyVar):
+                        env[k] = str(v)
+                    elif isinstance(v, GalaxyFileVar):
+                        env[k] = str(v)
+
+                # Run tool
+                cmd = [
+                    "conda",
+                    "run",
+                    "-n",
+                    self.tool.id,
+                    "--no-capture-output",
+                    "bash",
+                    script_path,
+                ]
+                self.logger.info(f"Running subprocess: {cmd}")
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    cmd,
+                    env=env,
+                    cwd=env["__tool_directory__"],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    self.logger.error(
+                        f"Error in running tool command: \n{result.stdout}\n{result.stderr}"
+                    )
+                    raise Exception(f"Error in running tool command: {result.stderr}")
+
+                # Get outputs
+                outputs = RheaOutput(
+                    return_code=result.returncode,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                )
+
+                if self.tool.outputs.data is not None:
+                    outputs.files = []
+                    for out in self.tool.outputs.data:
+                        if out.from_work_dir is not None:
+                            if (
+                                out.filters is not None
+                            ):  # TODO: Actually apply the filters, for now just best-effort try to copy the file
+                                try:
+                                    outputs.files.append(
+                                        RheaDataOutput.from_file(
+                                            env[out.name],
+                                            self.output_store,
+                                            name=out.name,
+                                            format=out.format,
+                                        )
+                                    )
+                                except Exception:
+                                    pass
+                            else:
                                 outputs.files.append(
                                     RheaDataOutput.from_file(
                                         env[out.name],
@@ -458,28 +483,20 @@ class RheaToolAgent(Agent):
                                         format=out.format,
                                     )
                                 )
-                            except Exception:
-                                pass
-                        else:
-                            outputs.files.append(
-                                RheaDataOutput.from_file(
-                                    env[out.name],
-                                    self.output_store,
-                                    name=out.name,
-                                    format=out.format,
-                                )
-                            )
 
-            elif self.tool.outputs.collection is not None:
-                outputs = RheaCollectionOuput(
-                    return_code=result.returncode,
-                    stdout=result.stdout,
-                    stderr=result.stderr,
-                    collections=self.tool.outputs.collection,
-                )
-                if outputs.files is None:
-                    outputs.files = []
-                    outputs.resolve(output, self.output_store)
+                elif self.tool.outputs.collection is not None:
+                    outputs = RheaCollectionOuput(
+                        return_code=result.returncode,
+                        stdout=result.stdout,
+                        stderr=result.stderr,
+                        collections=self.tool.outputs.collection,
+                    )
+                    if outputs.files is None:
+                        outputs.files = []
+                        outputs.resolve(output, self.output_store)
 
-            self.logger.info(f"Finished tool execution with results: {outputs}")
-            return outputs
+                self.logger.info(f"Finished tool execution with results: {outputs}")
+                return outputs
+        except Exception as e:
+            logging.exception("Error occured in `run_tool`")
+            raise
