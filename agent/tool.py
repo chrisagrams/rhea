@@ -8,7 +8,7 @@ from academy.agent import Agent, action
 from academy.logging import init_logging
 from typing import List, Optional
 from utils.schema import Tool, Param, ConfigFile
-from utils.proxy import RheaFileProxy
+from utils.proxy import RheaFileProxy, RheaFileHandle
 from agent.schema import *
 from agent.utils import install_conda_env, configure_tool_directory
 
@@ -280,7 +280,7 @@ class RheaToolAgent(Agent):
         params: List[RheaParam],
         tool_params: List[Param],
         input_dir: str,
-        input_store: Store,
+        input_store: Store[RedisConnector],
     ) -> None:
         # Configure parameters
         if self.tool_directory is not None:
@@ -298,7 +298,15 @@ class RheaToolAgent(Agent):
                 # Write content to a local temporary file
                 tmp_file_path = os.path.join(input_dir, proxy_obj.filename)
                 with open(tmp_file_path, "wb") as f:
-                    f.write(proxy_obj.contents)
+                    file_object: RheaFileHandle = proxy_obj.open(
+                        r=input_store.connector._redis_client
+                    )
+                    file_object.seek(0)
+
+                    # Write RheaFileObject in chunks to local temporary file
+                    for chunk in file_object.iter_chunks(1 << 20):
+                        f.write(chunk)
+
                     param.path = tmp_file_path  # Update param's local path
                     param.filename = os.path.basename(param.path)
                     self.logger.debug(f"Wrote '{param.value}' to '{param.path}'")

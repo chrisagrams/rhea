@@ -514,7 +514,9 @@ class RheaDataOutput:
         name: Optional[str] = None,
         format: Optional[str] = None,
     ) -> RheaDataOutput:
-        proxy: RheaFileProxy = RheaFileProxy.from_file(filepath)
+        proxy: RheaFileProxy = RheaFileProxy.from_file(
+            filepath, r=store.connector._redis_client
+        )
 
         if name is not None:
             proxy.name = name

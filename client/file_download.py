@@ -6,7 +6,7 @@ import cloudpickle
 import os
 from argparse import ArgumentParser
 
-from utils.proxy import RheaFileProxy
+from utils.proxy import RheaFileProxy, RheaFileHandle
 
 
 parser = ArgumentParser(description="Download files from ProxyStore")
@@ -25,10 +25,15 @@ connector = RedisConnector(args.hostname, args.port)
 
 def download_file(key: RedisKey, path: str, store: Store[RedisConnector]) -> str:
     proxy: RheaFileProxy = RheaFileProxy.from_proxy(key, store)
+    file_object: RheaFileHandle = proxy.open(store.connector._redis_client)
+
     output_path = os.path.realpath(os.path.join(path, proxy.filename))
 
+    file_object.seek(0)
+
     with open(output_path, "wb") as f:
-        f.write(proxy.contents)
+        for chunk in file_object.iter_chunks():
+            f.write(chunk)
 
     return output_path
 

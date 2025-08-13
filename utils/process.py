@@ -1,7 +1,7 @@
 import os
 from typing import List, Any
 from utils.schema import Tool, Test, Param, Conditional, Section
-from utils.proxy import RheaFileProxy
+from utils.proxy import RheaFileProxy, RheaFileHandle
 from agent.schema import (
     RheaParam,
     RheaOutput,
@@ -57,7 +57,7 @@ def get_test_file_from_store(
                 resp = fc.minio_client.get_object(fc.bucket, object_name)
                 content = resp.read()
                 proxy: RheaFileProxy = RheaFileProxy.from_buffer(
-                    os.path.basename(object_name), content
+                    os.path.basename(object_name), content, r=fc.connector._redis_client
                 )
                 key = RedisKey(redis_key=proxy.to_proxy(input_store))
                 p = RheaParam.from_param(input_param, key)
@@ -312,7 +312,7 @@ def process_inputs(
 
 
 def assert_tool_tests(
-    tool: Tool, test: Test, output: RheaDataOutput, store: Store
+    tool: Tool, test: Test, output: RheaDataOutput, store: Store[RedisConnector]
 ) -> bool:
     if test.output_collection is not None:
         if test.output_collection.elements is not None:
@@ -327,7 +327,11 @@ def assert_tool_tests(
                     return True
                 else:
                     proxy = RheaFileProxy.from_proxy(key=output.key, store=store)
-                    buffer = proxy.contents
+                    file_object: RheaFileHandle = proxy.open(
+                        r=store.connector._redis_client
+                    )
+                    buffer: bytes = file_object.read()
+
                     if buffer is not None:
                         try:
                             out.assert_contents.run_all(buffer)

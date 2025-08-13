@@ -22,7 +22,9 @@ connector = RedisConnector(args.hostname, args.port)
 
 
 def upload_file(filepath: str, store: Store[RedisConnector]) -> str:
-    proxy: RheaFileProxy = RheaFileProxy.from_file(filepath)
+    proxy: RheaFileProxy = RheaFileProxy.from_file(
+        filepath, store.connector._redis_client
+    )
     key = proxy.to_proxy(store)
     return key
 
