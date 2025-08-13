@@ -23,6 +23,7 @@ dependencies = [
     "openai>=1.93.0",
     "parsl>=2025.6.23",
     "pgvector>=0.4.1",
+    "prometheus-client>=0.22.1",
     "proxystore[all]>=0.8.2",
     "psycopg2-binary>=2.9.10",
     "pyright>=1.1.403",

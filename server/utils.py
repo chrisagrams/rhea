@@ -21,6 +21,8 @@ from pydantic import AnyUrl
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from redis import Redis
 
+import server.metrics as metrics
+
 
 def construct_params(inputs: Inputs) -> List[Parameter]:
     params = [param.to_python_parameter() for param in inputs.params]
@@ -128,112 +130,134 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
 
     def make_wrapper(tool_id, param_names):
         async def wrapper(*args, **kwargs):
-            # Get context
-            ctx: Context = kwargs.pop("ctx")
-            await ctx.info(f"Launching tool {tool_id}")
+            try:
+                # Log tool call
+                metrics.tool_execution_request_count.inc()
 
-            # Get settings from app context
-            settings: Settings = ctx.request_context.lifespan_context.settings
+                start_time = time.time()
 
-            # Configure Redis client to get handle
-            r = Redis(settings.redis_host, settings.redis_port)
+                # Get context
+                ctx: Context = kwargs.pop("ctx")
+                await ctx.info(f"Launching tool {tool_id}")
 
-            run_id = ctx.request_context.lifespan_context.run_id
+                # Get settings from app context
+                settings: Settings = ctx.request_context.lifespan_context.settings
 
-            db_sessionmaker: async_sessionmaker[AsyncSession] = (
-                ctx.request_context.lifespan_context.db_sessionmaker
-            )
+                # Configure Redis client to get handle
+                r = Redis(settings.redis_host, settings.redis_port)
 
-            async with db_sessionmaker() as session:
-                tool: Tool | None = await get_galaxytool_by_id(session, tool_id)
+                run_id = ctx.request_context.lifespan_context.run_id
 
-            if tool is None:
-                raise RuntimeError(f"No tool found with ID: {tool_id}")
-
-            await ctx.report_progress(0, 1)
-
-            for name, value in zip(param_names, args):
-                kwargs.setdefault(name, value)
-
-            # Construct RheaParams
-            rhea_params = process_user_inputs(tool, kwargs)
-
-            await ctx.report_progress(0.05, 1)
-
-            if tool_id not in ctx.request_context.lifespan_context.agents:
-                # First, quickly check if the agent exists in other contexts
-                unbound_handle: UnboundRemoteHandle | None = (
-                    await get_handle_from_redis(tool.id, run_id, r, timeout=1)
+                db_sessionmaker: async_sessionmaker[AsyncSession] = (
+                    ctx.request_context.lifespan_context.db_sessionmaker
                 )
 
-                # Another context already initialized this tool, bind it to this Academy client:
-                if unbound_handle is not None:
-                    handle: RemoteHandle = unbound_handle.bind_to_client(
-                        ctx.request_context.lifespan_context.academy_client
-                    )
-                    ctx.request_context.lifespan_context.agents[tool_id] = AgentState(
-                        tool_id=tool_id, handle=handle
-                    )
+                async with db_sessionmaker() as session:
+                    tool: Tool | None = await get_galaxytool_by_id(session, tool_id)
 
-                else:
-                    # Launch agent
-                    launch_agent(
-                        tool,
-                        run_id=run_id,
-                        redis_host=settings.agent_redis_host,
-                        redis_port=settings.agent_redis_port,
-                        minio_endpoint=settings.minio_endpoint,
-                        minio_access_key=settings.minio_access_key,
-                        minio_secret_key=settings.minio_secret_key,
-                        minio_secure=False,
-                    )
+                if tool is None:
+                    raise RuntimeError(f"No tool found with ID: {tool_id}")
 
+                await ctx.report_progress(0, 1)
+
+                for name, value in zip(param_names, args):
+                    kwargs.setdefault(name, value)
+
+                # Construct RheaParams
+                rhea_params = process_user_inputs(tool, kwargs)
+
+                await ctx.report_progress(0.05, 1)
+
+                if tool_id not in ctx.request_context.lifespan_context.agents:
+                    # First, quickly check if the agent exists in other contexts
                     unbound_handle: UnboundRemoteHandle | None = (
-                        await get_handle_from_redis(
-                            tool.id, run_id, r, timeout=settings.agent_handle_timeout
+                        await get_handle_from_redis(tool.id, run_id, r, timeout=1)
+                    )
+
+                    # Another context already initialized this tool, bind it to this Academy client:
+                    if unbound_handle is not None:
+                        handle: RemoteHandle = unbound_handle.bind_to_client(
+                            ctx.request_context.lifespan_context.academy_client
                         )
-                    )
+                        ctx.request_context.lifespan_context.agents[tool_id] = (
+                            AgentState(tool_id=tool_id, handle=handle)
+                        )
 
-                    if unbound_handle is None:
-                        raise RuntimeError("Never received handle from Parsl worker.")
+                    else:
+                        # Launch agent
+                        launch_agent(
+                            tool,
+                            run_id=run_id,
+                            redis_host=settings.agent_redis_host,
+                            redis_port=settings.agent_redis_port,
+                            minio_endpoint=settings.minio_endpoint,
+                            minio_access_key=settings.minio_access_key,
+                            minio_secret_key=settings.minio_secret_key,
+                            minio_secure=False,
+                        )
 
-                    handle: RemoteHandle = unbound_handle.bind_to_client(
-                        ctx.request_context.lifespan_context.academy_client
-                    )
+                        unbound_handle: UnboundRemoteHandle | None = (
+                            await get_handle_from_redis(
+                                tool.id,
+                                run_id,
+                                r,
+                                timeout=settings.agent_handle_timeout,
+                            )
+                        )
 
-                    await ctx.info(f"Lanched agent {handle.agent_id}")
+                        if unbound_handle is None:
+                            raise RuntimeError(
+                                "Never received handle from Parsl worker."
+                            )
 
-                    ctx.request_context.lifespan_context.agents[tool_id] = AgentState(
-                        tool_id=tool_id, handle=handle
-                    )
+                        handle: RemoteHandle = unbound_handle.bind_to_client(
+                            ctx.request_context.lifespan_context.academy_client
+                        )
 
-            # Get handle from dictionary
-            handle: RemoteHandle = ctx.request_context.lifespan_context.agents[
-                tool_id
-            ].handle
+                        await ctx.info(f"Lanched agent {handle.agent_id}")
 
-            await ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
-            await ctx.report_progress(0.1, 1)
+                        ctx.request_context.lifespan_context.agents[tool_id] = (
+                            AgentState(tool_id=tool_id, handle=handle)
+                        )
 
-            # Execute tool
-            tool_result: RheaOutput = await (await handle.run_tool(rhea_params))
+                # Get handle from dictionary
+                handle: RemoteHandle = ctx.request_context.lifespan_context.agents[
+                    tool_id
+                ].handle
 
-            await ctx.info(f"Tool {tool_id} finished in {handle.agent_id}")
-            await ctx.report_progress(1, 1)
+                await ctx.info(f"Executing tool {tool_id} in {handle.agent_id}")
+                await ctx.report_progress(0.1, 1)
 
-            result = MCPOutput.from_rhea(tool_result)
+                # Execute tool
+                tool_result: RheaOutput = await (await handle.run_tool(rhea_params))
 
-            # Add ProxyStore resource
-            if result.files is not None:
-                for file in result.files:
-                    ctx.request_context.lifespan_context.resource_manager.add_resource_to_context(
-                        resource=create_proxystore_function_resource(file, ctx)
-                    )
+                await ctx.info(f"Tool {tool_id} finished in {handle.agent_id}")
+                await ctx.report_progress(1, 1)
 
-            # Notify the client that we have new output resources
-            await ctx.request_context.session.send_resource_list_changed()
+                result = MCPOutput.from_rhea(tool_result)
 
-            return result
+                # Add ProxyStore resource
+                if result.files is not None:
+                    for file in result.files:
+                        ctx.request_context.lifespan_context.resource_manager.add_resource_to_context(
+                            resource=create_proxystore_function_resource(file, ctx)
+                        )
+
+                # Notify the client that we have new output resources
+                await ctx.request_context.session.send_resource_list_changed()
+
+                # Log execution time
+                metrics.tool_execution_runtime.observe(time.time() - start_time)
+
+                # Log successful tool execution
+                metrics.successful_tool_executions.inc()
+
+                return result
+
+            except Exception as e:
+                # Log failed tool execution
+                metrics.failed_tool_executions.inc()
+                raise
 
         return wrapper
 

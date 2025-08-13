@@ -3,10 +3,14 @@ import debugpy
 import logging
 import anyio
 import uuid
-import os
+import time
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from argparse import ArgumentParser
+from pathlib import Path
+from typing import List, Optional, Any
 
+# MCP SDK imports
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.resources.types import TextResource
 from mcp.server.lowlevel import Server
@@ -14,33 +18,46 @@ from mcp.server.stdio import stdio_server
 from mcp.server.sse import SseServerTransport
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
 
+# Starlette imports
+from starlette.requests import Request
+from starlette.responses import Response, JSONResponse
+
+# Academy imports
 from academy.exchange import UserExchangeClient
 from academy.exchange.redis import RedisExchangeFactory
 from academy.logging import init_logging
+
+# Embedding imports
 from openai import OpenAI
+
+# Helper imports
 from server.rhea_fastmcp import RheaFastMCP
 from server.client_manager import LocalClientManager, ClientManager
-from utils.schema import Tool
 from server.schema import AppContext, MCPTool, Settings, PBSSettings, K8Settings
+from server.utils import create_tool
+import server.metrics as metrics
+from utils.schema import Tool
+from utils.embedding import get_embedding, get_l2_distance
+from manager.parsl_config import generate_parsl_config
+
+# ProxyStore imports
+from proxystore.connectors.redis import RedisConnector
+from proxystore.store import Store
+import cloudpickle
+
+# Pydantic + SQLAlchemy imports
+from pydantic.networks import AnyUrl
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine,
     create_async_engine,
     async_sessionmaker,
 )
-from server.utils import create_tool
-from utils.embedding import get_embedding, get_l2_distance
-from manager.parsl_config import generate_parsl_config
-from typing import List, Optional, Any
 
-from proxystore.connectors.redis import RedisConnector
-from proxystore.store import Store
-import cloudpickle
-
-from pydantic.networks import AnyUrl
-from pydantic import ValidationError
-from argparse import ArgumentParser
-from pathlib import Path
+# Prometheus imports
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client.core import REGISTRY
 
 
 parser = ArgumentParser()
@@ -102,6 +119,8 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
     autoflush=False,
 )
 
+REGISTRY.register(metrics.RedisHashCollector(connector._redis_client, "conda_envs"))
+
 
 @asynccontextmanager
 async def app_lifespan(server: RheaFastMCP) -> AsyncIterator[AppContext]:
@@ -155,6 +174,11 @@ lowlevel_server: Server = mcp._mcp_server
 @mcp.tool(name="find_tools", title="Find Tools")
 async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     """A tool that will find and populate relevant tools given a query. Once called, the server will populate tools for you."""
+
+    # Increment Prometheus counter metric
+    metrics.find_tools_request_count.inc()
+
+    start_time = time.time()
 
     # Get session ID (if exists)
     session_id: str | None = None
@@ -228,7 +252,21 @@ async def find_tools(query: str, ctx: Context) -> List[MCPTool]:
     await ctx.request_context.session.send_tool_list_changed()  # notifiactions/tools/list_changed
     await ctx.request_context.session.send_resource_list_changed()  # notifications/resources/list_changed
 
+    metrics.find_tool_request_latency.observe(
+        time.time() - start_time
+    )  # Log request latency
+
     return result
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
+
+@mcp.custom_route("/metrics", methods=["GET"])
+async def metrics_endpoint(request: Request):
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 async def serve_stdio():
