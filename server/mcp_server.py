@@ -20,7 +20,7 @@ from mcp.server.fastmcp.tools import Tool as FastMCPTool
 
 # Starlette imports
 from starlette.requests import Request
-from starlette.responses import Response, JSONResponse
+from starlette.responses import Response, JSONResponse, StreamingResponse
 
 # Academy imports
 from academy.exchange import UserExchangeClient
@@ -38,10 +38,11 @@ from server.utils import create_tool
 import server.metrics as metrics
 from utils.schema import Tool
 from utils.embedding import get_embedding, get_l2_distance
+from utils.proxy import RheaFileHandle, RheaFileProxy
 from manager.parsl_config import generate_parsl_config
 
 # ProxyStore imports
-from proxystore.connectors.redis import RedisConnector
+from proxystore.connectors.redis import RedisConnector, RedisKey
 from proxystore.store import Store
 import cloudpickle
 
@@ -267,6 +268,55 @@ async def health_check(request: Request) -> JSONResponse:
 @mcp.custom_route("/metrics", methods=["GET"])
 async def metrics_endpoint(request: Request):
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@mcp.custom_route("/upload", methods=["POST"])
+async def upload(request: Request):
+
+    file_handle: RheaFileHandle = RheaFileHandle(r=connector._redis_client)
+
+    async for chunk in request.stream():
+        file_handle.append(chunk)
+
+    format = file_handle.filetype()
+    filename = request.headers.get("x-filename", file_handle.key)
+
+    proxy = RheaFileProxy(
+        name=filename,
+        format=format,
+        filename=filename,
+        filesize=len(file_handle),
+        file_key=file_handle.key,
+    )
+
+    with Store("rhea-input", connector=connector, register=True) as store:
+        key = proxy.to_proxy(store)
+
+    response = proxy.model_dump()
+    response["key"] = key
+    return JSONResponse(response)
+
+
+@mcp.custom_route("/download", methods=["GET"])
+async def download(request: Request):
+    key = request.query_params.get("key")
+    if not key:
+        return JSONResponse({"error": "Missing 'key' parameter"}, status_code=400)
+
+    with Store("rhea-input", connector, register=True) as store:
+        proxy: RheaFileProxy = RheaFileProxy.from_proxy(RedisKey(redis_key=key), store)
+
+    file_handle: RheaFileHandle = proxy.open(connector._redis_client)
+
+    async def file_iterator():
+        for chunk in file_handle.iter_chunks(8192):
+            yield chunk
+
+    return StreamingResponse(
+        file_iterator(),
+        media_type=proxy.format,
+        headers={"Content-Disposition": f'attachment; filename="{proxy.filename}"'},
+    )
 
 
 async def serve_stdio():
