@@ -1,4 +1,3 @@
-import parsl
 import debugpy
 import logging
 import anyio
@@ -9,6 +8,7 @@ from collections.abc import AsyncIterator
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import List, Optional, Any
+
 
 # MCP SDK imports
 from mcp.server.fastmcp import Context
@@ -21,6 +21,10 @@ from mcp.server.fastmcp.tools import Tool as FastMCPTool
 # Starlette imports
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse, StreamingResponse
+
+# Parsl imports
+import parsl
+from parsl import DataFlowKernel
 
 # Academy imports
 from academy.exchange import UserExchangeClient
@@ -293,6 +297,7 @@ async def metrics_endpoint(request: Request):
 
 @mcp.custom_route("/upload", methods=["POST"])
 async def upload(request: Request):
+    metrics.upload_requests.inc()  # Update upload metric
 
     file_handle: RheaFileHandle = RheaFileHandle(r=connector._redis_client)
 
@@ -302,11 +307,13 @@ async def upload(request: Request):
     format = file_handle.filetype()
     filename = request.headers.get("x-filename", file_handle.key)
 
+    filesize = len(file_handle)
+
     proxy = RheaFileProxy(
         name=filename,
         format=format,
         filename=filename,
-        filesize=len(file_handle),
+        filesize=filesize,
         file_key=file_handle.key,
     )
 
@@ -314,11 +321,16 @@ async def upload(request: Request):
 
     response = proxy.model_dump()
     response["key"] = key
+
+    metrics.upload_size.observe(filesize)  # Observe uploaded filesize metric
+
     return JSONResponse(response)
 
 
 @mcp.custom_route("/download", methods=["GET"])
 async def download(request: Request):
+    metrics.download_requests.inc()  # Upload download metric
+
     key = request.query_params.get("key")
     if not key:
         return JSONResponse({"error": "Missing 'key' parameter"}, status_code=400)
@@ -333,6 +345,10 @@ async def download(request: Request):
         )
 
     file_handle: RheaFileHandle = proxy.open(connector._redis_client)
+
+    metrics.download_size.observe(
+        len(file_handle)
+    )  # Observe downloaded filesize metric
 
     async def file_iterator():
         for chunk in file_handle.iter_chunks(8192):
@@ -387,7 +403,7 @@ async def serve_sse():
 
 async def main():
     try:
-        parsl.load(
+        dfk: DataFlowKernel = parsl.load(
             generate_parsl_config(
                 backend=settings.parsl_container_backend,
                 network=settings.parsl_container_network,
@@ -403,6 +419,9 @@ async def main():
                 k8_settings=k8_settings,
             )
         )
+
+        # Register Prometheus Parsl collector
+        REGISTRY.register(metrics.ParslCollector(dfk))
 
         match args.transport:
             case "stdio":
