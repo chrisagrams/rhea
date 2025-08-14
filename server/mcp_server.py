@@ -43,7 +43,9 @@ from manager.parsl_config import generate_parsl_config
 
 # ProxyStore imports
 from proxystore.connectors.redis import RedisConnector, RedisKey
-from proxystore.store import Store
+from proxystore.store import StoreConfig, get_or_create_store
+from proxystore.store.config import ConnectorConfig
+from proxystore.store.exceptions import StoreExistsError
 import cloudpickle
 
 # Pydantic + SQLAlchemy imports
@@ -98,12 +100,31 @@ if settings.debug_port is not None:
 run_id = str(uuid.uuid4())
 
 connector = RedisConnector(settings.redis_host, settings.redis_port)
-output_store = Store(
-    "rhea-output",
-    connector=connector,
-    register=True,
-    serializer=cloudpickle.dumps,
-    deserializer=cloudpickle.loads,
+
+input_store = get_or_create_store(
+    StoreConfig(
+        name="rhea-input",
+        connector=ConnectorConfig(kind="redis", options=connector.config()),
+        serializer=cloudpickle.dumps,
+        deserializer=cloudpickle.loads,
+        cache_size=16,
+        metrics=True,
+        populate_target=True,
+        auto_register=True,
+    )
+)
+
+output_store = get_or_create_store(
+    StoreConfig(
+        name="rhea-output",
+        connector=ConnectorConfig(kind="redis", options=connector.config()),
+        serializer=cloudpickle.dumps,
+        deserializer=cloudpickle.loads,
+        cache_size=16,
+        metrics=True,
+        populate_target=True,
+        auto_register=True,
+    )
 )
 
 client_manager = LocalClientManager(client_ttl=settings.client_ttl)
@@ -289,8 +310,7 @@ async def upload(request: Request):
         file_key=file_handle.key,
     )
 
-    with Store("rhea-input", connector=connector, register=True) as store:
-        key = proxy.to_proxy(store)
+    key = proxy.to_proxy(input_store)
 
     response = proxy.model_dump()
     response["key"] = key
@@ -303,8 +323,14 @@ async def download(request: Request):
     if not key:
         return JSONResponse({"error": "Missing 'key' parameter"}, status_code=400)
 
-    with Store("rhea-input", connector, register=True) as store:
-        proxy: RheaFileProxy = RheaFileProxy.from_proxy(RedisKey(redis_key=key), store)
+    try:
+        proxy: RheaFileProxy = RheaFileProxy.from_proxy(
+            RedisKey(redis_key=key), input_store
+        )
+    except ValueError:
+        proxy: RheaFileProxy = RheaFileProxy.from_proxy(
+            RedisKey(redis_key=key), output_store
+        )
 
     file_handle: RheaFileHandle = proxy.open(connector._redis_client)
 
