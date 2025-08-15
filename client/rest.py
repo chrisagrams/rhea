@@ -8,8 +8,10 @@ from urllib.parse import urlunparse, urljoin
 import httpx
 from prometheus_client.parser import text_string_to_metric_families
 
+from .base import RheaRESTClientBase
 
-class RheaRESTClient:
+
+class RheaRESTClient(RheaRESTClientBase):
     def __init__(self, hostname: str, port: int, secure: bool = False):
         self.hostname = hostname
         self.port = port

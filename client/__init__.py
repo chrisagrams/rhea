@@ -3,13 +3,30 @@ from pydantic import AnyUrl
 from typing import Optional, Type, Any
 from pathlib import Path
 
-from client.mcp import RheaMCPClient
-from client.rest import RheaRESTClient
+from .mcp import RheaMCPClient
+from .rest import RheaRESTClient
+from .base import RheaMCPClientBase, RheaRESTClientBase
 
 from mcp.types import Tool, Resource, TextResourceContents, BlobResourceContents
 
 
-class RheaClient:
+class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
+    """
+    A client class to interact with both the Rhea Model Context Protocol (MCP) server and REST backend.
+
+    The client class provides similar high-level interface to the one found within the Python MCP SDK.
+    
+    The class also provides additional utilities to interact with the REST backend such as file upload and downloads.
+
+    Example:
+    ```
+        async with RheaClient('localhost', 3001) as client:
+            # MCP call
+            tools = await client.find_tools('I need a tool to convert FASTA to FASTQ')
+            # REST call
+            key = await client.upload_file('test.txt')
+    ```
+    """
     def __init__(self, hostname: str, port: int, secure: bool = False):
         self._hostname = hostname
         self._port = port
@@ -52,28 +69,20 @@ class RheaClient:
             return await self.mcp_client.list_tools()
         raise RuntimeError("`mcp_client` is None")
 
-    list_tools.__doc__ = RheaMCPClient.list_tools.__doc__
-
     async def find_tools(self, query: str) -> list[dict]:
         if self.mcp_client is not None:
             return await self.mcp_client.find_tools(query)
         raise RuntimeError("`mcp_client` is None")
-
-    find_tools.__doc__ = RheaMCPClient.find_tools.__doc__
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict | None:
         if self.mcp_client is not None:
             return await self.mcp_client.call_tool(name, arguments)
         raise RuntimeError("`mcp_client` is None")
 
-    call_tool.__doc__ = RheaMCPClient.call_tool.__doc__
-
     async def list_resources(self) -> list[Resource]:
         if self.mcp_client is not None:
             return await self.mcp_client.list_resources()
         raise RuntimeError("`mcp_client` is None")
-
-    list_resources.__doc__ = RheaMCPClient.list_resources.__doc__
 
     async def read_resource(
         self, uri: AnyUrl
@@ -81,8 +90,6 @@ class RheaClient:
         if self.mcp_client is not None:
             return await self.mcp_client.read_resource(uri)
         raise RuntimeError("`mcp_clien` is None")
-
-    read_resource.__doc__ = RheaMCPClient.list_resources.__doc__
 
     async def upload_file(
         self,
@@ -94,8 +101,6 @@ class RheaClient:
         if self.rest_client is not None:
             return await self.rest_client.upload_file(path, name, timeout, chunk_size)
         raise RuntimeError("`rest_client` is None")
-
-    upload_file.__doc__ = RheaRESTClient.upload_file.__doc__
 
     async def download_file(
         self,
@@ -110,11 +115,7 @@ class RheaClient:
             )
         raise RuntimeError("`rest_client` is None")
 
-    download_file.__doc__ = RheaRESTClient.download_file.__doc__
-
     async def metrics(self) -> dict[str, list[dict]]:
         if self.rest_client is not None:
             return await self.rest_client.metrics()
         raise RuntimeError("`rest_client` is None")
-
-    metrics.__doc__ = RheaRESTClient.metrics.__doc__
