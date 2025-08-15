@@ -1,3 +1,5 @@
+# upload_file.py
+
 import asyncio
 from client import RheaClient
 from argparse import ArgumentParser
@@ -18,11 +20,11 @@ async def main():
     port = parsed_url.port
     secure = protocol == "https"
 
-    async with RheaClient(host, port, secure) as client:
-        result: dict = await client.upload_file(args.input_file, args.name)
+    async with RheaClient(host, port, secure) as client:  # (1)!
+        result: dict = await client.upload_file(args.input_file, args.name)  # (2)!
         print(result)
-        print(result["key"])
+        print(result["key"])  # (3)!
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())  # (4)!

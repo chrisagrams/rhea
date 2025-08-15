@@ -41,6 +41,9 @@ class RheaMCPClientBase(ABC):
     async def list_tools(self) -> list[Tool]:
         """
         List the currently available tools on the server for this session.
+
+        Returns:
+            list[Tool]: A list of MCP tool definitions.
         """
         pass
 
@@ -59,7 +62,7 @@ class RheaMCPClientBase(ABC):
             list[dict]: A list of tool descriptions matching the query.
 
         Raises:
-            RuntimeError: If the client session fails to initialize.
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass
 
@@ -77,7 +80,7 @@ class RheaMCPClientBase(ABC):
                          or None if there is no structured content.
 
         Raises:
-            RuntimeError: If the client session fails to initialize.
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass
 
@@ -93,7 +96,7 @@ class RheaMCPClientBase(ABC):
         Returns:
             ListResourcesResult: A result object containing the list of available resources.
         Raises:
-            RuntimeError: If the client session has not been initialized.
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass
 
@@ -115,7 +118,7 @@ class RheaMCPClientBase(ABC):
                 which can be either text or binary data.
 
         Raises:
-            RuntimeError: If the client session has not been initialized.
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass
 
@@ -164,6 +167,9 @@ class RheaRESTClientBase(ABC):
 
         Returns:
             dict: Server response
+
+        Raises:
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass
 
@@ -186,6 +192,9 @@ class RheaRESTClientBase(ABC):
 
         Returns:
             int: Size of downloaded file in bytes.
+
+        Raises:
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass
 
@@ -194,9 +203,12 @@ class RheaRESTClientBase(ABC):
         """
         Get Prometheus metrics from Rhea MCP server.
 
-        See: https://prometheus.io/docs/specs/om/open_metrics_spec/
+        See: [Prometheus Specification](https://prometheus.io/docs/specs/om/open_metrics_spec/)
 
         Returns:
             dict[str, list[dict]]: Server metrics
+
+        Raises:
+            RuntimeError: If the client session fails to initialize or used outside of a context manager.
         """
         pass

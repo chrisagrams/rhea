@@ -28,3 +28,6 @@ results/
 # Coverage reports
 .coverage
 .coverage.*
+
+# Site HTML
+site/

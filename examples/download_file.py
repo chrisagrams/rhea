@@ -1,3 +1,5 @@
+# download_file.py
+
 import asyncio
 from client import RheaClient
 from argparse import ArgumentParser
@@ -20,9 +22,9 @@ async def main():
     port = parsed_url.port
     secure = protocol == "https"
 
-    async with RheaClient(host, port, secure) as client:
-        await client.download_file(args.key, args.output_directory)
+    async with RheaClient(host, port, secure) as client:  # (1)!
+        await client.download_file(args.key, args.output_directory)  # (2)!
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())  # (3)!

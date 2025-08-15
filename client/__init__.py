@@ -19,12 +19,12 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
     The class also provides additional utilities to interact with the REST backend such as file upload and downloads.
 
     Example:
-    ```
-        async with RheaClient('localhost', 3001) as client:
-            # MCP call
-            tools = await client.find_tools('I need a tool to convert FASTA to FASTQ')
-            # REST call
-            key = await client.upload_file('test.txt')
+    ```python
+    async with RheaClient('localhost', 3001) as client:
+        # MCP call
+        tools = await client.find_tools('I need a tool to convert FASTA to FASTQ')
+        # REST call
+        key = await client.upload_file('test.txt')
     ```
     """
 
@@ -34,17 +34,17 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
         self._secure = secure
 
         self._mcp_ctx: Optional[RheaMCPClient] = None
-        self.mcp_client: Optional[RheaMCPClient] = None
+        self._mcp_client: Optional[RheaMCPClient] = None
 
         self._rest_ctx: Optional[RheaRESTClient] = None
-        self.rest_client: Optional[RheaRESTClient] = None
+        self._rest_client: Optional[RheaRESTClient] = None
 
     async def __aenter__(self) -> RheaClient:
         self._mcp_ctx = RheaMCPClient(self._hostname, self._port, self._secure)
-        self.mcp_client = await self._mcp_ctx.__aenter__()
+        self._mcp_client = await self._mcp_ctx.__aenter__()
 
         self._rest_ctx = RheaRESTClient(self._hostname, self._port, self._secure)
-        self.rest_client = await self._rest_ctx.__aenter__()
+        self._rest_client = await self._rest_ctx.__aenter__()
         return self
 
     async def __aexit__(
@@ -53,11 +53,11 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
         if self._mcp_ctx is not None:
             await self._mcp_ctx.__aexit__(exc_type, exc, tb)
             self._mcp_ctx = None
-            self.mcp_client = None
+            self._mcp_client = None
         if self._rest_ctx is not None:
             await self._rest_ctx.__aexit__(exc_type, exc, tb)
             self._rest_ctx = None
-            self.rest_client = None
+            self._rest_client = None
 
     def __enter__(self):
         raise RuntimeError("Use 'async with RheaClient(...)'")
@@ -66,30 +66,30 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
         pass
 
     async def list_tools(self) -> list[Tool]:
-        if self.mcp_client is not None:
-            return await self.mcp_client.list_tools()
+        if self._mcp_client is not None:
+            return await self._mcp_client.list_tools()
         raise RuntimeError("`mcp_client` is None")
 
     async def find_tools(self, query: str) -> list[dict]:
-        if self.mcp_client is not None:
-            return await self.mcp_client.find_tools(query)
+        if self._mcp_client is not None:
+            return await self._mcp_client.find_tools(query)
         raise RuntimeError("`mcp_client` is None")
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict | None:
-        if self.mcp_client is not None:
-            return await self.mcp_client.call_tool(name, arguments)
+        if self._mcp_client is not None:
+            return await self._mcp_client.call_tool(name, arguments)
         raise RuntimeError("`mcp_client` is None")
 
     async def list_resources(self) -> list[Resource]:
-        if self.mcp_client is not None:
-            return await self.mcp_client.list_resources()
+        if self._mcp_client is not None:
+            return await self._mcp_client.list_resources()
         raise RuntimeError("`mcp_client` is None")
 
     async def read_resource(
         self, uri: AnyUrl
     ) -> list[TextResourceContents | BlobResourceContents]:
-        if self.mcp_client is not None:
-            return await self.mcp_client.read_resource(uri)
+        if self._mcp_client is not None:
+            return await self._mcp_client.read_resource(uri)
         raise RuntimeError("`mcp_clien` is None")
 
     async def upload_file(
@@ -99,8 +99,8 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
         timeout: int = 300,
         chunk_size: int = 1 << 20,
     ) -> dict:
-        if self.rest_client is not None:
-            return await self.rest_client.upload_file(path, name, timeout, chunk_size)
+        if self._rest_client is not None:
+            return await self._rest_client.upload_file(path, name, timeout, chunk_size)
         raise RuntimeError("`rest_client` is None")
 
     async def download_file(
@@ -110,13 +110,13 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
         timeout: int = 300,
         chunk_size: int = 1 << 20,
     ) -> int:
-        if self.rest_client is not None:
-            return await self.rest_client.download_file(
+        if self._rest_client is not None:
+            return await self._rest_client.download_file(
                 key, output_directory, timeout, chunk_size
             )
         raise RuntimeError("`rest_client` is None")
 
     async def metrics(self) -> dict[str, list[dict]]:
-        if self.rest_client is not None:
-            return await self.rest_client.metrics()
+        if self._rest_client is not None:
+            return await self._rest_client.metrics()
         raise RuntimeError("`rest_client` is None")

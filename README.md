@@ -1,9 +1,10 @@
 # Rhea
-A RAG+MCP tool server for Galaxy Toolshed.
+A scalable MCP (Model Context Protocol) tool framework to serve *thousands* of biomedical tools for Large Language Models.
 
 Example executions with Claude:
-- https://claude.ai/share/37e6cf45-7139-405c-9280-61a469edf81f
-- https://claude.ai/share/ce922736-ab3a-4e1a-8901-8ca26cfb59cb
+
+- [A multi-step conversion from FASTA -> FASTQ -> CSV](https://claude.ai/share/37e6cf45-7139-405c-9280-61a469edf81f)
+- [A simple CSV to Tabular conversion](https://claude.ai/share/ce922736-ab3a-4e1a-8901-8ca26cfb59cb)
 
 
 ## How it works? 
@@ -24,7 +25,7 @@ Additionally, the server will need to point to an existing OpenAI-like endpoint 
 ### Instalation
 After cloning the repository, use `uv` to configure the virtual environment. 
 
-```
+``` bash
 uv sync
 ```
 
