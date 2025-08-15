@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 
-from utils.models import GalaxyTool
+from rhea.utils.models import GalaxyTool
 
 
 async def export_tools(db_url: str, limit: int, output: str):

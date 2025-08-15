@@ -57,9 +57,9 @@ RUN uv venv --python 3.10 /home/rhea/venv \
  && . /home/rhea/venv/bin/activate \
  && uv pip install parsl==2025.6.23 proxystore debugpy minio Cheetah3 academy-py==0.2.0 aiofiles conda-pack zstandard filetype python-magic
 
-COPY utils/ /home/rhea/app/utils
-COPY agent/ /home/rhea/app/agent
-COPY manager/ /home/rhea/app/manager
+COPY rhea/utils/ /home/rhea/app/rhea/utils
+COPY rhea/agent/ /home/rhea/app/rhea/agent
+COPY rhea/manager/ /home/rhea/app/rhea/manager
 
 # ENTRYPOINT ["/opt/venv/bin/python"]
 

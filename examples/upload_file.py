@@ -1,7 +1,7 @@
 # upload_file.py
 
 import asyncio
-from client import RheaClient
+from rhea.client import RheaClient
 from argparse import ArgumentParser
 from urllib.parse import urlparse
 

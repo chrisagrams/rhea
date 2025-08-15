@@ -7,10 +7,10 @@ import shlex
 import asyncio
 import logging
 from types import SimpleNamespace
-from agent.tool import RheaToolAgent
-from agent.utils import configure_tool_directory, cleanup_tool_directory
-from utils.schema import Tool, Test
-from utils.process import process_inputs
+from rhea.agent.tool import RheaToolAgent
+from rhea.agent.utils import configure_tool_directory, cleanup_tool_directory
+from rhea.utils.schema import Tool, Test
+from rhea.utils.process import process_inputs
 
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store

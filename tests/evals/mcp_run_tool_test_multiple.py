@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from argparse import ArgumentParser
 from tests.evals.helpers import run_tool_tests
-from server.schema import MCPOutput
+from rhea.server.schema import MCPOutput
 import urllib3
 
 

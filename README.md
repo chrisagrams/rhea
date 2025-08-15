@@ -94,7 +94,7 @@ And set the following configuration parameters:
 By default, the MCP server will start with STDIO transport for use with Claude Desktop. To enable SSE transport layer:
 
 ```bash
-uv run -m server.mcp_server --transport sse
+uv run -m rhea.server.mcp_server --transport sse
 ```
 
 ### Running with Streamable HTTP 

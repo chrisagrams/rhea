@@ -1,6 +1,7 @@
 import pytest
 
-from preprocess.utils.fetch import *
+import io
+from rhea.preprocess.utils.fetch import *
 
 
 @pytest.fixture

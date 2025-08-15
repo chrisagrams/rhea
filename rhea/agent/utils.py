@@ -8,7 +8,7 @@ import conda_pack
 import zstandard
 import tarfile
 import shutil
-from utils.schema import Requirement
+from rhea.utils.schema import Requirement
 from typing import List
 from tempfile import mkdtemp, mktemp
 from io import BytesIO

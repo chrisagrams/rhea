@@ -1,5 +1,5 @@
 from parsl import python_app
-from utils.schema import Tool
+from rhea.utils.schema import Tool
 
 
 @python_app(executors=["rhea-workers"])
@@ -19,7 +19,7 @@ def launch_agent(
     from academy.exchange.redis import RedisExchangeFactory
     from academy.manager import Manager
     from academy.exception import AgentTerminatedError
-    from agent.tool import RheaToolAgent
+    from rhea.agent.tool import RheaToolAgent
     from redis import Redis
 
     HEARTBEAT_INTERVAL = 30

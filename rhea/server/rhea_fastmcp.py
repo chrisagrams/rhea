@@ -15,13 +15,13 @@ from mcp.server.fastmcp.tools import Tool
 from mcp.server.fastmcp.resources.base import Resource
 from mcp.types import Tool as MCPTool
 from mcp.server.fastmcp.utilities.logging import get_logger
-from server.utils import create_tool
-from utils.schema import Tool as GalaxyTool
-from utils.models import get_galaxytool_by_name
+from rhea.server.utils import create_tool
+from rhea.utils.schema import Tool as GalaxyTool
+from rhea.utils.models import get_galaxytool_by_name
+from rhea.server.client_manager import ClientManager, ClientState
 from redis import Redis
 from pydantic import AnyUrl, BaseModel
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from server.client_manager import ClientManager, ClientState
 
 logger = get_logger(__name__)
 

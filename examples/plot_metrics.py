@@ -2,7 +2,7 @@ import asyncio
 import math
 from typing import Dict, Any, List
 import matplotlib.pyplot as plt
-from client import RheaClient
+from rhea.client import RheaClient
 
 
 def _rows(metrics: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:

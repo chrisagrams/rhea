@@ -4,8 +4,10 @@ import re
 import glob
 from typing import Any, List, Optional, cast
 from dataclasses import dataclass
-from utils.schema import Param, CollectionOutput
-from utils.proxy import RheaFileProxy
+
+from rhea.utils.schema import Param, CollectionOutput
+from rhea.utils.proxy import RheaFileProxy
+
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key

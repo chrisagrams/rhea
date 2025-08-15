@@ -3,15 +3,15 @@ from sqlalchemy import select
 from typing import List, Dict, Any
 from inspect import Signature, Parameter
 
-from agent.schema import RheaParam, RheaFileParam
+from rhea.agent.schema import RheaParam, RheaFileParam
 
-from utils.schema import Tool
-from utils.models import GalaxyTool, get_galaxytool_by_name
-from utils.process import process_inputs
+from rhea.utils.schema import Tool
+from rhea.utils.models import GalaxyTool, get_galaxytool_by_name
+from rhea.utils.process import process_inputs
 
 from tests.evals.helpers import unwrap_user_inputs
 
-from server.utils import construct_params, process_user_inputs
+from rhea.server.utils import construct_params, process_user_inputs
 
 TOOL_NAMES = [
     "fasta_to_fastq",

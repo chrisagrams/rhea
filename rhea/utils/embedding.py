@@ -1,7 +1,9 @@
 from openai import OpenAI
 from typing import List
-from utils.schema import Tool
-from utils.models import GalaxyTool
+
+from rhea.utils.schema import Tool
+from rhea.utils.models import GalaxyTool
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

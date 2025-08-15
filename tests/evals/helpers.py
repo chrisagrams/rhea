@@ -7,15 +7,15 @@ from datetime import datetime
 from pathlib import Path
 from contextlib import contextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.models import get_galaxytool_by_id
-from utils.process import process_inputs, process_outputs
-from utils.schema import Tool
-from server.schema import MCPOutput
+from rhea.utils.models import get_galaxytool_by_id
+from rhea.utils.process import process_inputs, process_outputs
+from rhea.utils.schema import Tool
+from rhea.server.schema import MCPOutput
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.types import CallToolResult
 from proxystore.connectors.redis import RedisConnector, RedisKey
-from agent.schema import RheaParam, RheaOutput, RheaMultiSelectParam
+from rhea.agent.schema import RheaParam, RheaOutput, RheaMultiSelectParam
 from minio import Minio
 from typing import List, Dict, Any
 

@@ -4,24 +4,25 @@ import asyncio
 import time
 import copy
 from mcp.server.fastmcp import Context
-from utils.schema import Tool, Inputs
 from mcp.server.fastmcp.tools import Tool as FastMCPTool
 from mcp.server.fastmcp.resources import FunctionResource
-from server.schema import MCPOutput, MCPDataOutput, Settings, AgentState
-from agent.schema import RheaParam, RheaOutput
-from utils.models import get_galaxytool_by_id
-from manager.utils import get_handle_from_redis
+
+from rhea.utils.schema import Tool, Inputs
+from rhea.server.schema import MCPOutput, MCPDataOutput, Settings, AgentState
+from rhea.agent.schema import RheaParam, RheaOutput
+from rhea.utils.models import get_galaxytool_by_id
+from rhea.manager.utils import get_handle_from_redis
+from rhea.manager.launch_agent import launch_agent
+import rhea.server.metrics as metrics
+
 from proxystore.connectors.redis import RedisKey
 from proxystore.store import Store
 from typing import List
 from inspect import Signature, Parameter
-from manager.launch_agent import launch_agent
 from academy.handle import UnboundRemoteHandle, RemoteHandle
 from pydantic import AnyUrl
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from redis import Redis
-
-import server.metrics as metrics
 
 
 def construct_params(inputs: Inputs) -> List[Parameter]:

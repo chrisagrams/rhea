@@ -4,9 +4,42 @@ from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider, PBSProProvider, KubernetesProvider
 from parsl.launchers import WrappedLauncher
 from kubernetes import config as k8s_config
-from server.schema import PBSSettings, K8Settings
+from pathlib import Path
+import tomli as tomllib
 
-DOCKER_IMAGE = "chrisagrams/rhea-worker-agent:latest"
+from rhea.server.schema import PBSSettings, K8Settings
+
+
+def _pkg_version() -> str | None:
+    try:
+        import rhea  # noqa: F401
+
+        v = getattr(rhea, "__version__", None)
+        return str(v) if v else None
+    except Exception:
+        return None
+
+
+def _pkg_version_from_toml() -> str | None:
+    try:
+        pyproject_path = Path("pyproject.toml")
+
+        with pyproject_path.open("rb") as f:
+            pyproject_data = tomllib.load(f)
+
+        return pyproject_data["project"]["version"]
+    except Exception:
+        return None
+
+
+PROJECT_VERSION = _pkg_version() or _pkg_version_from_toml()
+
+if PROJECT_VERSION is None:
+    raise RuntimeError("Could not determine current Rhea version.")
+
+DOCKER_IMAGE = (
+    f"chrisagrams/rhea-worker-agent:{PROJECT_VERSION}"  # Use current library version
+)
 
 docker_cmd = (
     "docker run --rm "

@@ -35,15 +35,15 @@ from academy.logging import init_logging
 from openai import OpenAI
 
 # Helper imports
-from server.rhea_fastmcp import RheaFastMCP
-from server.client_manager import LocalClientManager, ClientManager
-from server.schema import AppContext, MCPTool, Settings, PBSSettings, K8Settings
-from server.utils import create_tool
-import server.metrics as metrics
-from utils.schema import Tool
-from utils.embedding import get_embedding, get_l2_distance
-from utils.proxy import RheaFileHandle, RheaFileProxy
-from manager.parsl_config import generate_parsl_config
+from rhea.server.rhea_fastmcp import RheaFastMCP
+from rhea.server.client_manager import LocalClientManager, ClientManager
+from rhea.server.schema import AppContext, MCPTool, Settings, PBSSettings, K8Settings
+from rhea.server.utils import create_tool
+import rhea.server.metrics as metrics
+from rhea.utils.schema import Tool
+from rhea.utils.embedding import get_embedding, get_l2_distance
+from rhea.utils.proxy import RheaFileHandle, RheaFileProxy
+from rhea.manager.parsl_config import generate_parsl_config
 
 # ProxyStore imports
 from proxystore.connectors.redis import RedisConnector, RedisKey

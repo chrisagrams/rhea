@@ -1,4 +1,6 @@
 site_name: Rhea
+repo_url: https://github.com/chrisagrams/rhea
+repo_name: chrisagrams/rhea
 theme:
   name: material
   features:

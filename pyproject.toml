@@ -1,7 +1,7 @@
 [project]
-name = "rhea"
-version = "0.1.0"
-description = "Add your description here"
+name = "rhea-mcp"
+version = "0.1.1b2"
+description = "A scalable MCP (Model Context Protocol) tool framework to serve thousands of biomedical tools for Large Language Models."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -50,5 +50,4 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["server", "agent", "client", "manager", "lib", "utils"]
-exclude = ["test_files", "runinfo"]
+include = ["rhea*"]

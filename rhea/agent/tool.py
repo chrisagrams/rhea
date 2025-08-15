@@ -7,10 +7,11 @@ import logging
 from academy.agent import Agent, action
 from academy.logging import init_logging
 from typing import List, Optional
-from utils.schema import Tool, Param, ConfigFile
-from utils.proxy import RheaFileProxy, RheaFileHandle
-from agent.schema import *
-from agent.utils import install_conda_env, configure_tool_directory
+
+from rhea.utils.schema import Tool, Param, ConfigFile
+from rhea.utils.proxy import RheaFileProxy, RheaFileHandle
+from rhea.agent.schema import *
+from rhea.agent.utils import install_conda_env, configure_tool_directory
 
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store

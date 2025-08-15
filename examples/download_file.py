@@ -1,7 +1,7 @@
 # download_file.py
 
 import asyncio
-from client import RheaClient
+from rhea.client import RheaClient
 from argparse import ArgumentParser
 from pathlib import Path
 from urllib.parse import urlparse
