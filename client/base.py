@@ -194,9 +194,9 @@ class RheaRESTClientBase(ABC):
         """
         Get Prometheus metrics from Rhea MCP server.
 
-        See: https://prometheus.io/docs/specs/om/open_metrics_spec/ 
+        See: https://prometheus.io/docs/specs/om/open_metrics_spec/
 
-        Returns: 
+        Returns:
             dict[str, list[dict]]: Server metrics
         """
         pass

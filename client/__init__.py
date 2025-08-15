@@ -15,7 +15,7 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
     A client class to interact with both the Rhea Model Context Protocol (MCP) server and REST backend.
 
     The client class provides similar high-level interface to the one found within the Python MCP SDK.
-    
+
     The class also provides additional utilities to interact with the REST backend such as file upload and downloads.
 
     Example:
@@ -27,6 +27,7 @@ class RheaClient(RheaMCPClientBase, RheaRESTClientBase):
             key = await client.upload_file('test.txt')
     ```
     """
+
     def __init__(self, hostname: str, port: int, secure: bool = False):
         self._hostname = hostname
         self._port = port
