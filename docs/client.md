@@ -6,4 +6,4 @@ The client library utilizes both MCP and REST protocols of the Rhea server to al
 
 See [examples](examples.md) on how to use the Client library.
 
-::: client
+::: rhea.client
