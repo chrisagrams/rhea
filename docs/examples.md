@@ -34,6 +34,45 @@ This script can be found in [examples/find_tools.py](https://github.com/chrisagr
 3. List the tools avaiable on the server for this client.
 4. Make sure to run as a coroutine.
 
+
+#### Using FastMCP
+
+``` python
+import asyncio
+from argparse import ArgumentParser
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+from mcp.types import Tool
+
+parser = ArgumentParser(
+    description="Find relevant tools based on natural language query."
+)
+parser.add_argument("query", help="Natural language query")
+parser.add_argument("--url", help="URL of MCP server", default="http://localhost:3001")
+
+args = parser.parse_args()
+
+async def main():
+    async with streamablehttp_client(f"{args.url}/mcp") as (
+        read,
+        write,
+        get_session_id_callback,
+    ):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            await http_client_session.call_tool(
+                "find_tools", {"query": "I need a tool to convert FASTA to FASTQ"}
+            )
+            tools: list[Tool] = await client.list_tools()
+            print(tools)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+```
+
+
 ## File Management
 For many tools, you will need to manage input and output files for your tool calls. To assist with file management, the Rhea server exposes a REST API that allows for file uploads/downloads to the backend server.
 
