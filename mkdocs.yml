@@ -74,3 +74,4 @@ nav:
   - Examples: examples.md
   - Client Library: client.md
   - Server Deployment: deploy.md
+  - Configuration: configuration.md

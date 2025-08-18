@@ -24,6 +24,39 @@ if TYPE_CHECKING:
 
 
 class Settings(BaseSettings):
+    """
+    Base settings class for Rhea server.
+
+    Attributes:
+        host (str): Host interface to listen on. Defaults to `localhost`.
+        port (int): Port number to listen on. Defaults to `3001`.
+        debug_port (int, optional): Optionally specify port to enable debugpy.
+        database_url (str): URL to Postgres database. Defaults to `postgresql+asyncpg://postgres:postgres@localhost:5432/rhea`.
+        client_ttl (int): Time to maintain client state before flushing. Defaults to `3600` seconds.
+        parsl_container_backend (Literal['docker', 'podman']): Specify which container engine to use (Docker or Podman). Defaults to `docker`.
+        parsl_container_network (Literal['host', 'local']): Specify container networking. Defaults to `host`.
+        parsl_container_debug (bool): Whether to enable debugging port inside container. Defaults to `False`.
+        parsl_max_workers_per_node (int): Maximum number of workers per node for Parsl execution. Defaults to `1`.
+        parsl_provider (Literal['local', 'pbs', 'k8']): Parsl execution provider type. Defaults to `local`.
+        parsl_init_blocks (int): Initial number of blocks to provision. Defaults to `0`.
+        parsl_min_blocks (int): Minimum number of blocks to maintain. Defaults to `0`.
+        parsl_max_blocks (int): Maximum number of blocks allowed. Defaults to `5`.
+        parsl_nodes_per_block (int): Number of nodes per block. Defaults to `1`.
+        parsl_parallelism (int): Level of parallelism for Parsl execution. Defaults to `1`.
+        agent_handle_timeout (int): Time to wait to retrieve handle from agent in seconds. Defaults to `30`.
+        redis_host (str): Redis server host address. Defaults to `localhost`.
+        redis_port (int): Redis server port number. Defaults to `6379`.
+        embedding_url (str): URL endpoint for embedding service. Defaults to `http://localhost:8000/v1`.
+        embedding_key (str): API key for embedding service. Defaults to empty string.
+        model (str): Embedding model to use. Defaults to `Qwen/Qwen3-Embedding-0.6B`.
+        agent_redis_host (str): Redis host address for agent (may differ from main Redis). Defaults to `localhost`.
+        agent_redis_port (int): Redis port number for agent. Defaults to `6379`.
+        minio_endpoint (str): MinIO server endpoint address. Defaults to `localhost`.
+        minio_access_key (str): MinIO access key for authentication. Defaults to `minioadmin`.
+        minio_secret_key (str): MinIO secret key for authentication. Defaults to `minioadmin`.
+        
+    """
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
@@ -72,6 +105,19 @@ class Settings(BaseSettings):
 
 
 class PBSSettings(BaseSettings):
+    """
+    Configuration settings for PBS (Portable Batch System) execution provider.
+
+    Attributes:
+        account (str): PBS account name for job submission.
+        queue (str): PBS queue name to submit jobs to.
+        walltime (str): Maximum wall clock time for PBS jobs.
+        scheduler_options (str): Additional PBS scheduler options.
+        select_options (str): PBS select statement options for resource specification.
+        worker_init (str): Commands to run before workers are launched. Defaults to empty string.
+        cpus_per_node (int): Number of hardware threads per node. Defaults to `1`.
+
+    """
     model_config = SettingsConfigDict(env_file=".env_pbs", env_file_encoding="utf-8")
 
     account: str
@@ -84,6 +130,17 @@ class PBSSettings(BaseSettings):
 
 
 class K8Settings(BaseSettings):
+    """
+    Configuration settings for Kubernetes (K8s) execution provider.
+
+    Attributes:
+        namespace (str): Kubernetes namespace for pod deployment. Defaults to `rhea`.
+        max_cpu (float): Maximum CPU limit for pods. Defaults to `2.0`.
+        max_mem (str): Maximum memory limit for pods. Defaults to `2048Mi`.
+        request_cpu (float): CPU request for pods. Defaults to `1.0`.
+        request_mem (str): Memory request for pods. Defaults to `1024Mi`.
+
+    """
     model_config = SettingsConfigDict(env_file=".env_k8", env_file_encoding="utf-8")
 
     namespace: str = "rhea"
