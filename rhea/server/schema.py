@@ -54,7 +54,7 @@ class Settings(BaseSettings):
         minio_endpoint (str): MinIO server endpoint address. Defaults to `localhost`.
         minio_access_key (str): MinIO access key for authentication. Defaults to `minioadmin`.
         minio_secret_key (str): MinIO secret key for authentication. Defaults to `minioadmin`.
-        
+
     """
 
     model_config = SettingsConfigDict(
@@ -118,6 +118,7 @@ class PBSSettings(BaseSettings):
         cpus_per_node (int): Number of hardware threads per node. Defaults to `1`.
 
     """
+
     model_config = SettingsConfigDict(env_file=".env_pbs", env_file_encoding="utf-8")
 
     account: str
@@ -141,6 +142,7 @@ class K8Settings(BaseSettings):
         request_mem (str): Memory request for pods. Defaults to `1024Mi`.
 
     """
+
     model_config = SettingsConfigDict(env_file=".env_k8", env_file_encoding="utf-8")
 
     namespace: str = "rhea"
