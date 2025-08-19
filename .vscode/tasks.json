@@ -116,6 +116,16 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "Generate Badges",
+      "type": "shell",
+      "command": "uv run genbadge coverage -i coverage.xml -o .github/badges/coverage.svg && uv run genbadge tests -i pytest.xml -o .github/badges/tests.svg",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
     }
   ]
 }
