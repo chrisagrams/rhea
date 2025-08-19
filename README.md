@@ -1,4 +1,10 @@
 # Rhea
+[![PyPI - Version](https://img.shields.io/pypi/v/rhea-mcp.svg)](https://pypi.org/project/rhea-mcp/)
+[![Docker Pulls](https://img.shields.io/docker/pulls/chrisagrams/rhea-worker-agent.svg)](https://hub.docker.com/r/chrisagrams/rhea-worker-agent)
+![coverage](https://raw.githubusercontent.com/chrisagrams/rhea/main/.github/badges/coverage.svg)
+![tests](https://raw.githubusercontent.com/chrisagrams/rhea/main/.github/badges/tests.svg)
+
+
 A scalable MCP (Model Context Protocol) tool framework to serve *thousands* of biomedical tools for Large Language Models.
 
 Example executions with Claude:

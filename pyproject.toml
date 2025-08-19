@@ -15,6 +15,7 @@ dependencies = [
     "debugpy>=1.8.14",
     "fastapi[standard]>=0.115.14",
     "filetype>=1.2.0",
+    "genbadge[all]>=1.1.2",
     "greenlet>=3.2.3",
     "griffe-inherited-docstrings>=1.1.1",
     "kubernetes>=33.1.0",

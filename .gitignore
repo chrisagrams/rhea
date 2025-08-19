@@ -28,6 +28,8 @@ results/
 # Coverage reports
 .coverage
 .coverage.*
+coverage.xml
+pytest.xml
 
 # Site HTML
 site/
