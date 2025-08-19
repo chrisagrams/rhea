@@ -1,8 +1,8 @@
 import os
 from typing import List, Any
-from utils.schema import Tool, Test, Param, Conditional, Section
-from utils.proxy import RheaFileProxy, RheaFileHandle
-from agent.schema import (
+from rhea.utils.schema import Tool, Test, Param, Conditional, Section
+from rhea.utils.proxy import RheaFileProxy, RheaFileHandle
+from rhea.agent.schema import (
     RheaParam,
     RheaOutput,
     RheaDataOutput,

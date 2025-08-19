@@ -14,4 +14,4 @@ ENV PYTHONUNBUFFERED=1
 
 RUN uv sync --locked
 
-CMD ["uv", "run", "-m", "server.mcp_server", "--transport", "sse"]
+CMD ["uv", "run", "-m", "rhea.server.mcp_server", "--transport", "streamable-http"]

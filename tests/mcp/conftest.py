@@ -17,6 +17,8 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.client.sse import sse_client
 
+from rhea.utils.proxy import RheaFileHandle, RheaFileProxy
+
 from proxystore.connectors.redis import RedisKey, RedisConnector
 from proxystore.store import Store
 from proxystore.store.utils import get_key
@@ -46,7 +48,7 @@ async def db_session():
 
 
 @pytest.fixture
-def connector():
+def connector() -> RedisConnector:
     return RedisConnector("localhost", 6379)
 
 
@@ -77,7 +79,7 @@ async def http_client_session(coverage_env):
         "run",
         "--parallel-mode",
         "-m",
-        "server.mcp_server",
+        "rhea.server.mcp_server",
         "--transport",
         "streamable-http",
     ]
@@ -115,7 +117,7 @@ async def sse_client_session(coverage_env):
         "run",
         "--parallel-mode",
         "-m",
-        "server.mcp_server",
+        "rhea.server.mcp_server",
         "--transport",
         "sse",
     ]
@@ -154,7 +156,8 @@ def input_proxystore():
 
 
 @pytest.fixture()
-def example_csv(input_proxystore):
+def example_csv(input_proxystore: Store[RedisConnector]) -> str:
+    # Create example CSV as a bytes buffer
     data = [
         ["col1", "col2"],
         ["1", "2"],
@@ -166,6 +169,22 @@ def example_csv(input_proxystore):
     writer.writerows(data)
     text_buf.flush()
     buf.seek(0)
-    proxy = input_proxystore.proxy(buf.getvalue())
-    key = get_key(proxy)
-    return str(key.redis_key)  # type: ignore
+
+    # Put CSV buffer in Redis
+    file_handle: RheaFileHandle = RheaFileHandle(
+        r=input_proxystore.connector._redis_client
+    )
+    file_handle.append(buf.getvalue())
+
+    # Create RheaFileProxy object
+    proxy = RheaFileProxy(
+        name="test.csv",
+        format=file_handle.filetype(),
+        filename="test.csv",
+        filesize=len(file_handle),
+        file_key=file_handle.key,
+    )
+
+    # Store in ProxyStore
+    key = proxy.to_proxy(input_proxystore)
+    return key
