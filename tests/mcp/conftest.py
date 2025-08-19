@@ -115,7 +115,7 @@ async def sse_client_session(coverage_env):
         "run",
         "--parallel-mode",
         "-m",
-        "server.mcp_server",
+        "rhea.server.mcp_server",
         "--transport",
         "sse",
     ]
