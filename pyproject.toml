@@ -1,6 +1,6 @@
 [project]
 name = "rhea-mcp"
-version = "0.1.1b2"
+version = "0.1.1b3"
 description = "A scalable MCP (Model Context Protocol) tool framework to serve thousands of biomedical tools for Large Language Models."
 readme = "README.md"
 requires-python = ">=3.10"
