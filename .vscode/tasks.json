@@ -118,6 +118,16 @@
       }
     },
     {
+      "label": "Generate Coverage Report",
+      "type": "shell",
+      "command": "uv run pytest -q --cov=. --cov-report=xml --junitxml=pytest.xml",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Generate Badges",
       "type": "shell",
       "command": "uv run genbadge coverage -i coverage.xml -o .github/badges/coverage.svg && uv run genbadge tests -i pytest.xml -o .github/badges/tests.svg",

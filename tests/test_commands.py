@@ -7,10 +7,19 @@ import shlex
 import asyncio
 import logging
 from types import SimpleNamespace
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    AsyncEngine,
+    create_async_engine,
+    async_sessionmaker,
+)
+
 from rhea.agent.tool import RheaToolAgent
 from rhea.agent.utils import configure_tool_directory, cleanup_tool_directory
 from rhea.utils.schema import Tool, Test
 from rhea.utils.process import process_inputs
+from rhea.utils.models import get_galaxytool_by_id
 
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
@@ -27,11 +36,19 @@ def agent():
 
 
 @pytest.fixture
-def tools():
-    with open(
-        "/Users/chrisgrams/Notes/Argonne/Galaxy-Tool-Wrapper/tools_dict.pkl", "rb"
-    ) as f:
-        return pickle.load(f)
+async def db_session():
+    DATABASE_URL = os.environ.get(
+        "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/rhea"
+    )
+    engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False, future=True)
+    AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+    async with AsyncSessionLocal() as db_session:
+        yield db_session
 
 
 @pytest.fixture
@@ -50,7 +67,7 @@ def minio_client():
 
 
 @pytest.fixture
-def sample_tool(tools):
+async def sample_tool(db_session):
     # tool_id = "c198b9ec43cfbe0e"
     # tool_id = "783bde422b425bd9"
     # tool_id = "a74ca2106a7a2073"
@@ -77,7 +94,10 @@ def sample_tool(tools):
     # tool_id = "dba308ddf7976bcd"
     # tool_id = "b24d624f2c53f698"
     tool_id = "85625aa18c72655a"
-    return tools.get(tool_id) or next(iter(tools.values()))
+
+    tool: Tool | None = await get_galaxytool_by_id(db_session, tool_id=tool_id)
+
+    return tool
 
 
 ignore_codes = [
@@ -131,13 +151,14 @@ def test_simple_replace_galaxy_var_with_default(agent):
     assert agent.tool.command.command == "echo 5"
 
 
-def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
+async def test_configfiles(
+    anyio_backend, agent, sample_tool: Tool, connector, minio_client
+):
     agent.tool = sample_tool
     agent.minio = minio_client
     agent.logger = logging.getLogger(__name__)
-    agent.tool_directory = asyncio.run(
-        configure_tool_directory(sample_tool.id, minio_client)
-    )
+    agent.tool_directory = await configure_tool_directory(sample_tool.id, minio_client)
 
     if len(sample_tool.tests.tests) == 0:
         assert True
@@ -176,13 +197,14 @@ def test_configfiles(agent, sample_tool: Tool, connector, minio_client):
             assert True
 
 
-def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
+async def test_expand_galaxy_if(
+    anyio_backend, agent, sample_tool: Tool, connector, minio_client
+):
     agent.tool = sample_tool
     agent.minio = minio_client
     agent.logger = logging.getLogger(__name__)
-    agent.tool_directory = asyncio.run(
-        configure_tool_directory(sample_tool.id, minio_client)
-    )
+    agent.tool_directory = await configure_tool_directory(sample_tool.id, minio_client)
 
     if len(sample_tool.tests.tests) == 0:
         assert True
@@ -232,4 +254,4 @@ def test_expand_galaxy_if(agent, sample_tool: Tool, connector, minio_client):
             assert True
             return
     finally:
-        asyncio.run(cleanup_tool_directory(agent.tool_directory))
+        await cleanup_tool_directory(agent.tool_directory)
