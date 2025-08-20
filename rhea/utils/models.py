@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import AsyncSession
 from pgvector.sqlalchemy import Vector
+from typing import List
 from .schema import Tool
 
 Base = declarative_base()
@@ -55,3 +56,10 @@ async def get_galaxytool_by_name(session: AsyncSession, tool_name: str) -> Tool 
     if row is None:
         return row
     return row.definition
+
+
+async def get_all_tool_ids(session: AsyncSession) -> List[str] | None:
+    statement = select(GalaxyTool.id)
+    result = await session.execute(statement)
+    tool_ids = [row[0] for row in result.fetchall()]
+    return tool_ids if tool_ids else None
