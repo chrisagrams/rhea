@@ -425,13 +425,12 @@ class RheaToolAgent(Agent):
                     os.chmod(script_path, 0o755)
 
                 # Remove any objects from environment
-                for k, v in env.items():
-                    if isinstance(v, list):
+                for k in list(env.keys()):
+                    v = env[k]
+                    if isinstance(v, (list, GalaxyVar, GalaxyFileVar)):
                         env[k] = str(v)
-                    elif isinstance(v, GalaxyVar):
-                        env[k] = str(v)
-                    elif isinstance(v, GalaxyFileVar):
-                        env[k] = str(v)
+                    elif v is None:
+                        env.pop(k)
 
                 # Run tool
                 cmd = [
