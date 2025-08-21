@@ -308,7 +308,7 @@ def process_inputs(
                                 populate_defaults(section_param, section)
                             )
 
-    # Fix stranglers 
+    # Fix stranglers
     # TODO: a better fix than this
     for test_param in test.params:
         current_tool_param = None
@@ -339,14 +339,10 @@ def process_inputs(
                                 test_param.format = param.format
             if test_param.type == None:
                 test_param.type = "text"
-            if test_param.type == 'data':
-                tool_params.append(
-                    get_test_file_from_store(test_param, test_param, fc)
-                )
+            if test_param.type == "data":
+                tool_params.append(get_test_file_from_store(test_param, test_param, fc))
             else:
-                tool_params.append(
-                    RheaParam.from_param(test_param, test_param.value)
-                )
+                tool_params.append(RheaParam.from_param(test_param, test_param.value))
 
     return tool_params
 
