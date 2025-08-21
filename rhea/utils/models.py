@@ -52,9 +52,9 @@ async def get_galaxytool_by_id(session: AsyncSession, tool_id: str) -> Tool | No
 async def get_galaxytool_by_name(session: AsyncSession, tool_name: str) -> Tool | None:
     statement = select(GalaxyTool).where(GalaxyTool.name == tool_name)
     result = await session.execute(statement)
-    row = result.scalar_one_or_none()
+    row = result.scalars().first()
     if row is None:
-        return row
+        return None
     return row.definition
 
 
