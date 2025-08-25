@@ -225,6 +225,8 @@ class RheaToolAgent(Agent):
 
         # Ensure the template sees real callables/modules, not variables from env
         context["json"] = json
+        context["os"] = os
+        context["re"] = re
         context["chr"] = builtins.chr
         context["int"] = builtins.int
         context["str"] = builtins.str
