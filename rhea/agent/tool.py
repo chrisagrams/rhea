@@ -4,6 +4,7 @@ import json
 import re
 import asyncio
 import logging
+import builtins
 from academy.agent import Agent, action
 from academy.logging import init_logging
 from typing import List, Optional
@@ -221,6 +222,15 @@ class RheaToolAgent(Agent):
                                 else:
                                     current.set_nested(nested_key, GalaxyVar({}))
                             current = current._nested[nested_key]
+
+        # Ensure the template sees real callables/modules, not variables from env
+        context["json"] = json
+        context["chr"] = builtins.chr
+        context["int"] = builtins.int
+        context["str"] = builtins.str
+        context["len"] = builtins.len
+        context["enumerate"] = builtins.enumerate
+        context["dict"] = builtins.dict
 
         tmpl = Template(source=cmd, searchList=[context])
         return tmpl.respond()
