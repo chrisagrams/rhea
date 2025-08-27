@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from argparse import ArgumentParser
 from tqdm import tqdm
 from openai import OpenAI
-from typing import List
+from typing import Dict
 
 parser = ArgumentParser("Migrate pickle file to Postgres")
 parser.add_argument("pickle_file", default="tools_dict.pkl")
@@ -41,7 +41,7 @@ client = OpenAI(base_url=args.embedding_url, api_key=args.api_key)
 
 if __name__ == "__main__":
     with open(args.pickle_file, "rb") as f:
-        tools: dict[str, Tool] = pickle.load(f)
+        tools: Dict[str, Tool] = pickle.load(f)
 
     session = SessionLocal()
 
@@ -55,12 +55,12 @@ if __name__ == "__main__":
 
             if existing_tool:
                 # Update existing tool
-                existing_tool.name = tool.name or ""
-                existing_tool.user_provided_name = tool.user_provided_name
-                existing_tool.description = tool.description
-                existing_tool.long_description = tool.long_description
-                existing_tool.documentation = tool.documentation
-                existing_tool.embedding = generate_tool_documentation_embedding(
+                existing_tool.name = tool.name or ""  # type: ignore
+                existing_tool.user_provided_name = tool.user_provided_name  # type: ignore
+                existing_tool.description = tool.description  # type: ignore
+                existing_tool.long_description = tool.long_description  # type: ignore
+                existing_tool.documentation = tool.documentation  # type: ignore
+                existing_tool.embedding = generate_tool_documentation_embedding(  # type: ignore
                     tool, client, args.model
                 )
                 existing_tool.definition = tool
