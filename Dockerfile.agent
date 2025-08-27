@@ -1,3 +1,4 @@
+FROM docker:cli AS dockercli
 FROM debian:stable-slim
 
 LABEL org.opencontainers.image.source=https://github.com/chrisagrams/rhea
@@ -8,8 +9,11 @@ ENV MINICONDA_HOME=/home/rhea/conda \
     PATH=/home/rhea/conda/bin:$PATH
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends wget ca-certificates bzip2 gettext-base locales \
+  && apt-get install -y --no-install-recommends wget ca-certificates bzip2 gettext-base locales podman \
   && rm -rf /var/lib/apt/lists/*
+
+# Copy Docker cli
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 
 # Generate locales
 RUN sed -i '/en_US.UTF-8/s/^# *//' /etc/locale.gen \

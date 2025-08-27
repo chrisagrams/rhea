@@ -4,12 +4,13 @@ from asyncio.subprocess import PIPE
 import aiofiles
 import logging
 import subprocess
+from subprocess import CompletedProcess
 import conda_pack
 import zstandard
 import tarfile
 import shutil
 from rhea.utils.schema import Requirement
-from typing import List
+from typing import List, Literal
 from tempfile import mkdtemp, mktemp
 from io import BytesIO
 from minio import Minio
@@ -179,3 +180,105 @@ def unpack_conda_env(env_name: str, r: StrictRedis, target_path: str) -> None:
     conda_unpack = os.path.join(target_path, "bin", "conda-unpack")
     subprocess.run([conda_unpack], cwd=target_path, check=True)
     logger.info(f"Unpacked environment {env_name}")
+
+
+async def pull_image(image: str, engine: Literal["docker", "podman"]):
+    cmd = [engine, "pull"]
+    if engine == "podman":
+        cmd += ["--remote", "-H", "unix:///run/podman/podman.sock"]
+    cmd.append(image)
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    out_b, err_b = await proc.communicate()
+
+    if proc.returncode != 0:
+        msg = (err_b or out_b).decode(errors="replace").strip()
+        logger.error(f"{engine} pull failed: {msg}")
+        raise RuntimeError(f"{engine} pull failed")
+    logger.info((out_b or err_b).decode(errors="replace").strip())
+
+
+async def remove_image(image: str, engine: Literal["docker", "podman"]):
+    cmd = [engine]
+    if engine == "podman":
+        cmd += ["--remote", "-H", "unix:///run/podman/podman.sock"]
+    cmd.append("rmi")
+    cmd.append(image)
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        msg = (stderr or stdout).decode(errors="replace").strip()
+        logger.error(f"{engine} image remove failed: {msg}")
+        raise RuntimeError(f"{engine} image remove failed")
+    logger.info((stdout or stderr).decode(errors="replace").strip())
+
+
+async def run_command_w_conda(
+    tool_id: str, script_path: str, env: dict[str, str]
+) -> CompletedProcess:
+    cmd = [
+        "conda",
+        "run",
+        "-n",
+        tool_id,
+        "--no-capture-output",
+        "bash",
+        script_path,
+    ]
+    logger.info(f"Running subprocess: {cmd}")
+    result = await asyncio.to_thread(
+        subprocess.run,
+        cmd,
+        env=env,
+        cwd=env["__tool_directory__"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        logger.error(
+            f"Error in running tool command: \n{result.stdout}\n{result.stderr}"
+        )
+        raise Exception(f"Error in running tool command: {result.stderr}")
+    return result
+
+
+async def run_command_in_container(
+    image: str,
+    engine: Literal["docker", "podman"],
+    script_path: str,
+    env: dict[str, str],
+) -> CompletedProcess:
+    cmd = [engine]
+    if engine == "podman":
+        cmd += ["--remote", "-H", "unix:///run/podman/podman.sock"]
+    cmd += ["run", "--rm", "-v", "/tmp:/tmp"]
+
+    for key, value in env.items():
+        cmd += ["-e", f"{key}={value}"]
+
+    cmd += [image, "bash", script_path]
+
+    logger.debug(f"Starting container with command: {' '.join(cmd)}")
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await process.communicate()
+
+    if process.returncode is None:
+        raise RuntimeError("No return code returned!")
+
+    result = CompletedProcess(
+        args=cmd, returncode=process.returncode, stdout=stdout, stderr=stderr
+    )
+
+    return result

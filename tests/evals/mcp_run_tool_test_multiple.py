@@ -3,6 +3,7 @@ import logging
 import csv
 import time
 from datetime import datetime
+from typing import List
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine,
@@ -125,10 +126,10 @@ async def main():
             start_time = datetime.now().isoformat()
             start = time.perf_counter()
             error_msg = ""
-            result = None
+            results = []
             try:
                 logger.info(f"Worker {worker_id} starting {tool_id}")
-                result: MCPOutput | None = await test_tool(tool_id)
+                results: List[MCPOutput | None] = await test_tool(tool_id)
                 logger.info(f"Worker {worker_id} finished {tool_id}")
             except Exception as e:
                 error_msg = str(e)
@@ -138,23 +139,24 @@ async def main():
             end_time = datetime.now().isoformat()
             elapsed = time.perf_counter() - start
 
-            return_code = None
-            if result is not None:
-                return_code = result.return_code
-
-            async with lock:
-                writer.writerow(
-                    [
-                        tool_id,
-                        worker_id,
-                        start_time,
-                        end_time,
-                        f"{elapsed:.6f}",
-                        return_code,
-                        error_msg,
-                    ]
-                )
-                results_f.flush()
+            for result in results:
+                if result is not None:
+                    return_code = result.return_code
+                else:
+                    return_code = None
+                async with lock:
+                    writer.writerow(
+                        [
+                            tool_id,
+                            worker_id,
+                            start_time,
+                            end_time,
+                            f"{elapsed:.6f}",
+                            return_code,
+                            error_msg,
+                        ]
+                    )
+                    results_f.flush()
 
             worker_queue.put_nowait(worker_id)
 

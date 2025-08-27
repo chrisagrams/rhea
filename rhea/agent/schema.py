@@ -244,6 +244,8 @@ class RheaParam:
             return RheaSelectParam.from_param(param, value)
         elif param.type == "data_column":
             return RheaTextParam.from_param(param, value)
+        elif param.type == "hidden":
+            return RheaTextParam.from_param(param, value)
         raise NotImplementedError(f"Param {param.type} not implemented.")
 
 

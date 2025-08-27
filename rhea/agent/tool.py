@@ -4,14 +4,22 @@ import json
 import re
 import asyncio
 import logging
+import builtins
 from academy.agent import Agent, action
 from academy.logging import init_logging
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from rhea.utils.schema import Tool, Param, ConfigFile
 from rhea.utils.proxy import RheaFileProxy, RheaFileHandle
 from rhea.agent.schema import *
-from rhea.agent.utils import install_conda_env, configure_tool_directory
+from rhea.agent.utils import (
+    install_conda_env,
+    configure_tool_directory,
+    pull_image,
+    remove_image,
+    run_command_w_conda,
+    run_command_in_container,
+)
 
 from proxystore.connectors.redis import RedisConnector
 from proxystore.store import Store
@@ -28,6 +36,7 @@ class RheaToolAgent(Agent):
     def __init__(
         self,
         tool: Tool,
+        container_runtime: Literal["docker", "podman"],
         redis_host: str,
         redis_port: int,
         minio_endpoint: str,
@@ -37,6 +46,7 @@ class RheaToolAgent(Agent):
     ) -> None:
         super().__init__()
         self.tool: Tool = tool
+        self.container_runtime: Literal["docker", "podman"] = container_runtime
         self.installed_packages: List[str]
         self.tool_directory: str | None = None
         self.connector = RedisConnector(redis_host, redis_port)
@@ -85,32 +95,58 @@ class RheaToolAgent(Agent):
             deserializer=cloudpickle.loads,
         )
 
-        # Create coroutine to create Conda environment and install Conda packages
-        conda_coro = install_conda_env(
-            env_name=self.tool.id,
-            requirements=self.tool.requirements.requirements,
-            r=self.connector._redis_client,
-            target_path=f"/home/rhea/conda/envs/{self.tool.id}",
-        )
         # Create coroutine to pull the tool files and configure tool directory
         dir_coro = configure_tool_directory(self.tool.id, self.minio)
 
-        # Populate results
-        self.installed_packages, self.tool_directory = await asyncio.gather(
-            conda_coro, dir_coro
-        )
+        # If there are containers present in the requirements, pull the first one
+        if len(self.tool.requirements.containers) > 0:
+            engine = self.tool.requirements.containers[0].type
+            if engine != "docker":
+                raise NotImplementedError(
+                    f"Container engine type {engine} not implemented."
+                )
+            image = self.tool.requirements.containers[0].value
 
-        self.logger.debug(f"self.installed_packages: {self.installed_packages}")
+            # Create a coroutine to pull docker image
+            pull_image_coro = pull_image(image, self.container_runtime)
+
+            # Run coroutines
+            _, self.tool_directory = await asyncio.gather(pull_image_coro, dir_coro)
+            self.logger.debug(f"Pulled image {image} using {self.container_runtime}")
+
+        # Otherwise, build Conda environment
+        else:
+            # Create coroutine to create Conda environment and install Conda packages
+            conda_coro = install_conda_env(
+                env_name=self.tool.id,
+                requirements=self.tool.requirements.requirements,
+                r=self.connector._redis_client,
+                target_path=f"/home/rhea/conda/envs/{self.tool.id}",
+            )
+
+            # Populate results
+            self.installed_packages, self.tool_directory = await asyncio.gather(
+                conda_coro, dir_coro
+            )
+            self.logger.debug(f"self.installed_packages: {self.installed_packages}")
+
         self.logger.debug(f"self.tool_directory: {self.tool_directory}")
         self._startup_done.set()  # Signal completion
 
     async def agent_on_shutdown(self) -> None:
+        # Cleanup container image
+        if len(self.tool.requirements.containers) > 0:
+            image = self.tool.requirements.containers[0].value
+            self.logger.info(f"Removing container image {image}")
+            await remove_image(image, engine=self.container_runtime)
+
         # Delete Conda environment
-        self.logger.info(f"Deleting Conda environment {self.tool.id}")
-        cmd = ["conda", "env", "remove", "-n", self.tool.id]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Error deleting Conda environment: {result.stdout}")
+        else:
+            self.logger.info(f"Deleting Conda environment {self.tool.id}")
+            cmd = ["conda", "env", "remove", "-n", self.tool.id]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Error deleting Conda environment: {result.stdout}")
 
     @action
     async def get_installed_packages(self) -> List[str]:
@@ -221,6 +257,17 @@ class RheaToolAgent(Agent):
                                 else:
                                     current.set_nested(nested_key, GalaxyVar({}))
                             current = current._nested[nested_key]
+
+        # Ensure the template sees real callables/modules, not variables from env
+        context["json"] = json
+        context["os"] = os
+        context["re"] = re
+        context["chr"] = builtins.chr
+        context["int"] = builtins.int
+        context["str"] = builtins.str
+        context["len"] = builtins.len
+        context["enumerate"] = builtins.enumerate
+        context["dict"] = builtins.dict
 
         tmpl = Template(source=cmd, searchList=[context])
         return tmpl.respond()
@@ -425,39 +472,22 @@ class RheaToolAgent(Agent):
                     os.chmod(script_path, 0o755)
 
                 # Remove any objects from environment
-                for k, v in env.items():
-                    if isinstance(v, list):
+                for k in list(env.keys()):
+                    v = env[k]
+                    if isinstance(v, (list, GalaxyVar, GalaxyFileVar)):
                         env[k] = str(v)
-                    elif isinstance(v, GalaxyVar):
-                        env[k] = str(v)
-                    elif isinstance(v, GalaxyFileVar):
-                        env[k] = str(v)
+                    elif v is None:
+                        env.pop(k)
 
-                # Run tool
-                cmd = [
-                    "conda",
-                    "run",
-                    "-n",
-                    self.tool.id,
-                    "--no-capture-output",
-                    "bash",
-                    script_path,
-                ]
-                self.logger.info(f"Running subprocess: {cmd}")
-                result = await asyncio.to_thread(
-                    subprocess.run,
-                    cmd,
-                    env=env,
-                    cwd=env["__tool_directory__"],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    self.logger.error(
-                        f"Error in running tool command: \n{result.stdout}\n{result.stderr}"
+                if len(self.tool.requirements.containers) > 0:
+                    # Run tool in container
+                    image = self.tool.requirements.containers[0].value
+                    result = await run_command_in_container(
+                        image, self.container_runtime, script_path, env
                     )
-                    raise Exception(f"Error in running tool command: {result.stderr}")
-
+                else:
+                    # Run tool with Conda
+                    result = await run_command_w_conda(self.tool.id, script_path, env)
                 # Get outputs
                 outputs = RheaOutput(
                     return_code=result.returncode,

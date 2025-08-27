@@ -308,6 +308,42 @@ def process_inputs(
                                 populate_defaults(section_param, section)
                             )
 
+    # Fix stranglers
+    # TODO: a better fix than this
+    for test_param in test.params:
+        current_tool_param = None
+        for tool_param in tool_params:
+            if tool_param.name == test_param.name:
+                current_tool_param = tool_param
+        if current_tool_param is None:
+            if test_param.type is None:
+                for param in tool.inputs.params:
+                    if param.name == test_param.name:
+                        test_param.type = param.type
+                        test_param.format = param.format
+                if tool.inputs.conditionals is not None:
+                    for conditional in tool.inputs.conditionals:
+                        if conditional.param.name == test_param.name:
+                            test_param.type = conditional.param.type
+                            test_param.format = conditional.param.format
+                        for when in conditional.whens:
+                            for param in when.params:
+                                if param.name == test_param.name:
+                                    test_param.type = param.type
+                                    test_param.format = param.format
+                if tool.inputs.sections is not None:
+                    for section in tool.inputs.sections:
+                        for param in section.params:
+                            if param.name == test_param.name:
+                                test_param.type = param.type
+                                test_param.format = param.format
+            if test_param.type == None:
+                test_param.type = "text"
+            if test_param.type == "data":
+                tool_params.append(get_test_file_from_store(test_param, test_param, fc))
+            else:
+                tool_params.append(RheaParam.from_param(test_param, test_param.value))
+
     return tool_params
 
 

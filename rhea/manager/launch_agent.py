@@ -1,11 +1,13 @@
 from parsl import python_app
 from rhea.utils.schema import Tool
+from typing import Literal
 
 
 @python_app(executors=["rhea-workers"])
 def launch_agent(
     tool: Tool,
     run_id: str,
+    container_runtime: Literal["docker", "podman"],
     redis_host: str,
     redis_port: int,
     minio_endpoint: str,
@@ -37,6 +39,7 @@ def launch_agent(
         handle = await manager.launch(
             RheaToolAgent(
                 tool,
+                container_runtime=container_runtime,
                 redis_host=redis_host,
                 redis_port=redis_port,
                 minio_endpoint=minio_endpoint,

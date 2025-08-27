@@ -77,7 +77,7 @@ async def run_tool_tests(
     minio_access: str = "admin",
     minio_secret: str = "password",
     http_client: urllib3.PoolManager | None = None,
-) -> MCPOutput | None:
+) -> List[MCPOutput | None]:
     if http_client is None:
         http_client = urllib3.PoolManager(
             num_pools=1,
@@ -111,6 +111,7 @@ async def run_tool_tests(
 
             logger.info(f"🛠️ Executing tool {tool_name}")
 
+            test_results: List[MCPOutput | None] = []
             for test in tool.tests.tests:
                 for input_param in tool.inputs.params:
                     if input_param.name is None and input_param.argument is not None:
@@ -138,7 +139,8 @@ async def run_tool_tests(
                         logger.info("✅ Test passed")
                     else:
                         logger.info("🟨 Tool executed. Tests did not pass.")
-                    return mcp_output
+                    test_results.append(mcp_output)
                 else:
                     logger.info(f"❌ Tool execution failed: {result.content}")
-                    return None
+                    test_results.append(None)
+            return test_results

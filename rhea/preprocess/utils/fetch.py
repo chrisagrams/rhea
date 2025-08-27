@@ -1,6 +1,6 @@
 import requests
 import json
-from typing import List
+from typing import List, Dict
 import io
 import logging
 import tarfile
@@ -8,7 +8,7 @@ import tarfile
 logger = logging.getLogger(__name__)
 
 
-def get_galaxy_repositories() -> dict[str, List[dict]]:
+def get_galaxy_repositories() -> List[Dict]:
     url = "https://toolshed.g2.bx.psu.edu/api/repositories"
     logger.info(f"Fetching Galaxy repositories from {url}")
 

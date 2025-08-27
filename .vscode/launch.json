@@ -2,6 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Debug update tools module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rhea.preprocess.update_tools",
+      "justMyCode": false
+    },
+    {
       "name": "Run manager module",
       "type": "debugpy",
       "request": "launch",
