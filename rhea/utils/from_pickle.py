@@ -45,22 +45,52 @@ if __name__ == "__main__":
 
     session = SessionLocal()
 
+    inserted_count = 0
+    updated_count = 0
+
     for tool_id, tool in tqdm(tools.items(), desc="Processing tools"):
-        galaxy_tool = GalaxyTool(
-            id=tool_id,
-            name=tool.name or "",
-            user_provided_name=tool.user_provided_name,
-            description=tool.description,
-            long_description=tool.long_description,
-            documentation=tool.documentation,
-            embedding=generate_tool_documentation_embedding(tool, client, args.model),
-        )
-        galaxy_tool.definition = tool
         try:
-            session.add(galaxy_tool)
+            # Check if the tool already exists
+            existing_tool = session.query(GalaxyTool).filter_by(id=tool_id).first()
+
+            if existing_tool:
+                # Update existing tool
+                existing_tool.name = tool.name or ""
+                existing_tool.user_provided_name = tool.user_provided_name
+                existing_tool.description = tool.description
+                existing_tool.long_description = tool.long_description
+                existing_tool.documentation = tool.documentation
+                existing_tool.embedding = generate_tool_documentation_embedding(
+                    tool, client, args.model
+                )
+                existing_tool.definition = tool
+                updated_count += 1
+                tqdm.write(f"Updated tool {tool_id}")
+            else:
+                # Insert new tool
+                galaxy_tool = GalaxyTool(
+                    id=tool_id,
+                    name=tool.name or "",
+                    user_provided_name=tool.user_provided_name,
+                    description=tool.description,
+                    long_description=tool.long_description,
+                    documentation=tool.documentation,
+                    embedding=generate_tool_documentation_embedding(
+                        tool, client, args.model
+                    ),
+                )
+                galaxy_tool.definition = tool
+                session.add(galaxy_tool)
+                inserted_count += 1
+                tqdm.write(f"Inserted new tool {tool_id}")
+
             session.commit()
+
         except Exception as e:
             session.rollback()
-            tqdm.write(f"Failed to insert tool {tool_id}")
+            tqdm.write(f"Failed to process tool {tool_id}: {str(e)}")
 
-    print(f"Inserted {len(tools)} tools into the database.")
+    print(
+        f"Inserted {inserted_count} new tools and updated {updated_count} existing tools in the database."
+    )
+    session.close()
