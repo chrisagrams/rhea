@@ -41,25 +41,39 @@ DOCKER_IMAGE = (
     f"chrisagrams/rhea-worker-agent:{PROJECT_VERSION}"  # Use current library version
 )
 
+
 docker_cmd = (
     "docker run --rm "
     "{debug_port} "
     "--platform linux/amd64 "  # Ensure amd64 platform is used
+    "-v /var/run/docker.sock:/var/run/docker.sock "  # Mount Docker socket
+    "-v /tmp:/tmp "  # Mount temp to allow file sharing between containers
     "{network_flag} "
     "{docker_image} "
 )
 
 podman_cmd = (
+    "sh -lc '"
+    "uid=$(id -u); "
+    'if [ "$uid" -eq 0 ]; then sock=/run/podman/podman.sock; '
+    'else run_dir=$XDG_RUNTIME_DIR; [ -n "$run_dir" ] || run_dir=/run/user/$uid; '
+    "sock=$run_dir/podman/podman.sock; fi; "
+    'dir=$(dirname "$sock"); [ -d "$dir" ] || mkdir -p "$dir"; '
+    'if [ ! -S "$sock" ]; then nohup sh -lc "podman system service --time=0 unix://$sock" >/dev/null 2>&1 & fi; '
+    'i=0; while [ ! -S "$sock" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done; '
+    'if [ ! -S "$sock" ]; then echo "podman socket not available: $sock"; exit 1; fi; '
+    "export CONTAINER_HOST=unix://$sock; "
     "podman run --rm "
-    "-e HTTP_PROXY "
-    "-e HTTPS_PROXY "
-    "-e http_proxy "
-    "-e https_proxy "
-    "{debug_port} "
+    "-e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy "
+    "{debug_port}"
     "--user root "
     "--platform linux/amd64 "  # Ensure amd64 platform is used
-    "{network_flag} "
+    "{network_flag}"
+    "-v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock "  # Mount Podman socket
+    "-v /tmp:/tmp "  # Mount temp to allow file sharing between containers
+    "-e CONTAINER_HOST=unix:///run/podman/podman.sock "
     "docker://{docker_image} "
+    "'"
 )
 
 
