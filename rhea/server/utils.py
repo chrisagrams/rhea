@@ -189,6 +189,7 @@ def create_tool(tool: Tool, ctx: Context) -> FastMCPTool:
                         launch_agent(
                             tool,
                             run_id=run_id,
+                            container_runtime=settings.parsl_container_backend,
                             redis_host=settings.agent_redis_host,
                             redis_port=settings.agent_redis_port,
                             minio_endpoint=settings.minio_endpoint,

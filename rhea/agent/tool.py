@@ -7,7 +7,7 @@ import logging
 import builtins
 from academy.agent import Agent, action
 from academy.logging import init_logging
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from rhea.utils.schema import Tool, Param, ConfigFile
 from rhea.utils.proxy import RheaFileProxy, RheaFileHandle
@@ -29,6 +29,7 @@ class RheaToolAgent(Agent):
     def __init__(
         self,
         tool: Tool,
+        container_runtime: Literal["docker", "podman"],
         redis_host: str,
         redis_port: int,
         minio_endpoint: str,

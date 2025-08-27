@@ -45,6 +45,7 @@ async def run_tool_tests(tool: Tool) -> List[bool]:
     launch_agent(
         tool,
         run_id,
+        container_runtime="docker",
         redis_host="host.docker.internal",
         redis_port=6379,
         minio_endpoint="host.docker.internal:9000",
