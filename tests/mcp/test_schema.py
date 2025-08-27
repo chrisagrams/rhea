@@ -59,3 +59,11 @@ async def test_single_tool_schema(
                 param.value = None  # type: ignore
         assert len(manager_params) == len(resulting_params)
         assert [str(p) for p in manager_params] == [str(p) for p in resulting_params]
+
+
+@pytest.mark.parametrize("tool_name", ["msconvert"])
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
+async def test_container_name(anyio_backend, tool_name, db_session):
+    tool: Tool | None = await get_galaxytool_by_name(db_session, tool_name)
+    assert tool
+    assert len(tool.requirements.containers) > 0

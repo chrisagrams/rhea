@@ -141,8 +141,14 @@ class Requirement(BaseModel):
     value: str
 
 
+class Container(BaseModel):
+    type: str
+    value: str
+
+
 class Requirements(BaseModel):
     requirements: List[Requirement]
+    containers: List[Container]
 
 
 class Regex(BaseModel):
@@ -736,9 +742,16 @@ class Tool(BaseModel):
                 )
                 for r in reqs_el.findall("requirement")
             ]
-            requirements = Requirements(requirements=reqs)
+            containers = [
+                Container(
+                    type=r.get("type") or "",
+                    value=r.text or "",
+                )
+                for r in reqs_el.findall("container")
+            ]
+            requirements = Requirements(requirements=reqs, containers=containers)
         else:
-            requirements = Requirements(requirements=[])
+            requirements = Requirements(requirements=[], containers=[])
 
         # stdio
         stdio_el = root.find("stdio")
