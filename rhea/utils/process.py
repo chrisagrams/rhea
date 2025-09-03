@@ -128,6 +128,11 @@ def populate_defaults(
         result.extend(
             populate_regular_and_conditional(param, collection.name, param.value)
         )
+    elif param.type == "hidden":
+        param.type = "text"
+        result.extend(
+            populate_regular_and_conditional(param, collection.name, param.value)
+        )
     elif param.optional:
         return result
     else:
