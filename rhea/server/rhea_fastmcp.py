@@ -1,27 +1,31 @@
-from mcp.server.fastmcp.tools import ToolManager
-from mcp.server.fastmcp.resources import ResourceManager
 from typing import Any, List
 from collections.abc import Callable, Iterable
+from pydantic import AnyUrl
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+# MCP SDK imports
+from mcp.server.fastmcp.tools import ToolManager
+from mcp.server.fastmcp.resources import ResourceManager
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import Context
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.shared.context import LifespanContextT, RequestT
 from mcp.server.session import ServerSessionT
-from mcp.types import AnyFunction, Resource as MCPResource, ToolAnnotations
 from mcp.server.fastmcp.exceptions import ToolError, ResourceError
 from mcp.server.auth.provider import OAuthAuthorizationServerProvider, TokenVerifier
 from mcp.server.streamable_http import EventStore
 from mcp.server.fastmcp.tools import Tool
 from mcp.server.fastmcp.resources.base import Resource
-from mcp.types import Tool as MCPTool
 from mcp.server.fastmcp.utilities.logging import get_logger
-from rhea.server.utils import create_tool
+from mcp.shared.context import LifespanContextT, RequestT
+from mcp.types import AnyFunction, Resource as MCPResource, ToolAnnotations
+from mcp.types import Tool as MCPTool
+
+# Helper imports
 from rhea.utils.schema import Tool as GalaxyTool
 from rhea.utils.models import get_galaxytool_by_name
+from rhea.server.utils import create_tool
 from rhea.server.client_manager import ClientManager, ClientState
-from redis import Redis
-from pydantic import AnyUrl, BaseModel
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
 
 logger = get_logger(__name__)
 
