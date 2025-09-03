@@ -22,7 +22,8 @@ from rhea.agent.utils import (
 )
 
 from proxystore.connectors.redis import RedisConnector
-from proxystore.store import Store
+from proxystore.store import StoreConfig, get_or_create_store
+from proxystore.store.config import ConnectorConfig
 import cloudpickle
 
 from tempfile import TemporaryDirectory, NamedTemporaryFile
@@ -49,6 +50,7 @@ class RheaToolAgent(Agent):
         self.container_runtime: Literal["docker", "podman"] = container_runtime
         self.installed_packages: List[str]
         self.tool_directory: str | None = None
+        self.extra_preferences: dict = {}
         self.connector = RedisConnector(redis_host, redis_port)
         self.input_store: Store | None = None
         self.output_store: Store | None = None
@@ -80,19 +82,34 @@ class RheaToolAgent(Agent):
 
     async def agent_on_startup(self) -> None:
         # Initialize ProxyStore
-        self.input_store = Store(
-            "rhea-input",
-            connector=self.connector,
-            register=True,
-            serializer=cloudpickle.dumps,
-            deserializer=cloudpickle.loads,
+        self.input_store = get_or_create_store(
+            StoreConfig(
+                name="rhea-input",
+                connector=ConnectorConfig(
+                    kind="redis", options=self.connector.config()
+                ),
+                serializer=cloudpickle.dumps,
+                deserializer=cloudpickle.loads,
+                cache_size=16,
+                metrics=True,
+                populate_target=True,
+                auto_register=True,
+            )
         )
-        self.output_store = Store(
-            "rhea-output",
-            connector=self.connector,
-            register=True,
-            serializer=cloudpickle.dumps,
-            deserializer=cloudpickle.loads,
+
+        self.output_store = get_or_create_store(
+            StoreConfig(
+                name="rhea-output",
+                connector=ConnectorConfig(
+                    kind="redis", options=self.connector.config()
+                ),
+                serializer=cloudpickle.dumps,
+                deserializer=cloudpickle.loads,
+                cache_size=16,
+                metrics=True,
+                populate_target=True,
+                auto_register=True,
+            )
         )
 
         # Create coroutine to pull the tool files and configure tool directory
@@ -335,6 +352,10 @@ class RheaToolAgent(Agent):
             env["__tool_directory__"] = self.tool_directory
         else:
             raise RuntimeError(f"Tool directory is not configured.")
+
+        # Initialize __user__ variable
+        # env["__user__"] = {}
+        # env["__user__"]["extra_preferences"] = self.extra_preferences
 
         for param in params:
             if isinstance(param, RheaFileParam):
