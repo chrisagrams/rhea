@@ -106,17 +106,17 @@ class GalaxyVar:
             return self._nested[name]
         v = self._value
         if isinstance(v, Mapping) and name in v:
-            return v[name]
+            return self._wrap(v[name])
         if hasattr(v, name):
             return getattr(v, name)
-        return ""
+        return GalaxyVar({})
 
     def __getitem__(self, key):
         if key in self._nested:
             return self._nested[key]
         v = self._value
         if isinstance(v, Mapping) and key in v:
-            return v[key]
+            return self._wrap(v[key])
         if isinstance(v, (list, tuple)) and (
             isinstance(key, int) or isinstance(key, slice)
         ):
@@ -124,7 +124,7 @@ class GalaxyVar:
         try:
             return v[key]
         except Exception:
-            return ""
+            return GalaxyVar({})
 
     def __setitem__(self, key, value):
         self.set_nested(str(key), value)
@@ -159,6 +159,14 @@ class GalaxyVar:
         if isinstance(other, GalaxyVar):
             return self._value == other._value and self._nested == other._nested
         return self._value == other
+
+    def get(self, key, default=None):
+        if key in self._nested:
+            return self._nested[key]
+        v = self._value
+        if isinstance(v, Mapping) and key in v:
+            return self._wrap(v[key])
+        return default if default is not None else GalaxyVar("")
 
 
 class RheaParam:

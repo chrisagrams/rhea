@@ -159,6 +159,7 @@ async def test_configfiles(
     agent.minio = minio_client
     agent.logger = logging.getLogger(__name__)
     agent.tool_directory = await configure_tool_directory(sample_tool.id, minio_client)
+    agent.extra_preferences = {}
 
     if len(sample_tool.tests.tests) == 0:
         assert True
@@ -205,6 +206,7 @@ async def test_expand_galaxy_if(
     agent.minio = minio_client
     agent.logger = logging.getLogger(__name__)
     agent.tool_directory = await configure_tool_directory(sample_tool.id, minio_client)
+    agent.extra_preferences = {}
 
     if len(sample_tool.tests.tests) == 0:
         assert True

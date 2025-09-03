@@ -1,5 +1,7 @@
 import os
+import cloudpickle
 from typing import List, Any
+
 from rhea.utils.schema import Tool, Test, Param, Conditional, Section
 from rhea.utils.proxy import RheaFileProxy, RheaFileHandle
 from rhea.agent.schema import (
@@ -12,10 +14,9 @@ from rhea.agent.schema import (
 
 from proxystore.connectors.redis import RedisConnector, RedisKey
 from proxystore.store import Store
-import cloudpickle
+from proxystore.store.utils import get_key
 
 from minio import Minio
-from proxystore.store.utils import get_key
 
 
 class FileConnector:
@@ -125,6 +126,11 @@ def populate_defaults(
             populate_regular_and_conditional(param, collection.name, param.value)
         )
     elif param.type == "float":
+        result.extend(
+            populate_regular_and_conditional(param, collection.name, param.value)
+        )
+    elif param.type == "hidden":
+        param.type = "text"
         result.extend(
             populate_regular_and_conditional(param, collection.name, param.value)
         )

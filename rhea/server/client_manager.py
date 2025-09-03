@@ -1,8 +1,8 @@
-from pydantic import BaseModel
-from mcp.server.fastmcp.resources.base import Resource
-from redis import Redis
 from cachetools import TTLCache
+from pydantic import BaseModel
+from redis import Redis
 from mcp.server.fastmcp.tools import Tool
+from mcp.server.fastmcp.resources.base import Resource
 
 
 class ClientState(BaseModel):

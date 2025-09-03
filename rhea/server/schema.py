@@ -1,23 +1,29 @@
 from dataclasses import dataclass
+from datetime import datetime
 from logging import Logger
-from openai import OpenAI
-from academy.identifier import AgentId
-from academy.exchange import UserExchangeClient
-from academy.exchange.redis import RedisExchangeFactory
-from proxystore.connectors.redis import RedisKey, RedisConnector
-from proxystore.store import Store
-
-from rhea.utils.schema import Tool
-from rhea.agent.tool import RheaToolAgent
-from rhea.agent.schema import RheaDataOutput, RheaOutput
-from rhea.server.client_manager import ClientManager
+from typing import List, Optional, Literal, TYPE_CHECKING
 
 from pydantic import BaseModel, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from typing import List, Optional, Literal, TYPE_CHECKING
+
+# Embedding imports
+from openai import OpenAI
+
+# ProxyStore imports
+from proxystore.connectors.redis import RedisKey, RedisConnector
+from proxystore.store import Store
+
+# Academy imports
+from academy.exchange import UserExchangeClient
+from academy.exchange.redis import RedisExchangeFactory
 from academy.handle import RemoteHandle
-from datetime import datetime
+from academy.identifier import AgentId
+
+# Helper imports
+from rhea.utils.schema import Tool
+from rhea.agent.schema import RheaDataOutput, RheaOutput
+from rhea.server.client_manager import ClientManager
 
 if TYPE_CHECKING:
     from rhea.server.rhea_fastmcp import RheaResourceManager
