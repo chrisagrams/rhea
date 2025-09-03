@@ -354,8 +354,8 @@ class RheaToolAgent(Agent):
             raise RuntimeError(f"Tool directory is not configured.")
 
         # Initialize __user__ variable
-        # env["__user__"] = {}
-        # env["__user__"]["extra_preferences"] = self.extra_preferences
+        env["__user__"] = {}
+        env["__user__"]["extra_preferences"] = self.extra_preferences
 
         for param in params:
             if isinstance(param, RheaFileParam):
@@ -493,6 +493,7 @@ class RheaToolAgent(Agent):
                     os.chmod(script_path, 0o755)
 
                 # Remove any objects from environment
+                env["__user__"] = ""  # Clear __user__
                 for k in list(env.keys()):
                     v = env[k]
                     if isinstance(v, (list, GalaxyVar, GalaxyFileVar)):

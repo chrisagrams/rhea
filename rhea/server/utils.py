@@ -49,6 +49,9 @@ def process_user_inputs(tool: Tool, args: dict) -> List[RheaParam]:
     res = []
 
     for param in tool.inputs.params:
+        if param.name is None and param.argument is not None:
+            param.name = param.argument.replace("--", "")
+
         a = args.get(param.name, None)
 
         if a is not None:
